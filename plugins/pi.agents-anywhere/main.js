@@ -30,6 +30,7 @@ async function onPanelInvoke(channel, payload) {
       case 'anywhere.parse': return parseCommand(payload?.command);
       case 'anywhere.disconnect': client.disconnect(); return client.status();
       case 'anywhere.connect': {
+        client.log('connect_received');
         const config = validateConfig(payload, manifest.net.domains, PROFILES);
         if (typeof pi.net?.fetch !== 'function' || typeof pi.net?.websocket?.connect !== 'function' || typeof pi.net?.websocket?.send !== 'function' || typeof pi.net?.websocket?.close !== 'function' || typeof pi.events?.on !== 'function' || typeof pi.events?.off !== 'function') {
           fail('UNSUPPORTED', 'Host network/event APIs are unavailable.');
@@ -41,6 +42,7 @@ async function onPanelInvoke(channel, payload) {
     }
   } catch (error) {
     // Never forward arbitrary host/network errors: they may include credentials.
+    if (['anywhere.connect', 'anywhere.parse'].includes(channel)) client?.log('configuration_rejected', error instanceof SafeError ? error.code : 'UNAVAILABLE');
     if (error instanceof SafeError) throw error;
     throw new SafeError('UNAVAILABLE', 'Operation failed. Check host permissions and the sanitized connection status.');
   }

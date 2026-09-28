@@ -2,6 +2,8 @@
 const { SafeError, record } = require('./config');
 const { PROFILES, endpoints } = require('./profiles');
 const { RuntimeAdapter, METHODS } = require('./runtime');
+const { transportCode } = require('./diagnostics');
+const { version } = require('../manifest.json');
 
 class Connector {
   constructor(pi, options = {}) {
@@ -15,13 +17,14 @@ class Connector {
     this.publicConfig = { profile: 'current', serverUrl: 'https://web.agents-anywhere.com', connectorId: '' };
     this.listeners = []; this.timers = new Set(); this.socketId = null;
     this.config = null; this.want = false; this.attempts = 0;
+    this.log('plugin_loaded', version);
   }
   log(event, detail = '') {
     this.logs.unshift({ time: new Date().toISOString(), event, detail });
     this.logs.length = Math.min(80, this.logs.length);
   }
   status() {
-    return { state: this.state, ...this.publicConfig, runtime: this.runtime.status(),
+    return { pluginVersion: version, state: this.state, ...this.publicConfig, runtime: this.runtime.status(),
       profiles: Object.values(PROFILES).map(({ id, label, enabled, baseline }) => ({ id, label, enabled, baseline })),
       compatibility: { current: PROFILES.current.baseline, legacy: PROFILES.legacy.baseline },
       logs: this.logs.map(item => ({ ...item })),
@@ -68,10 +71,11 @@ class Connector {
     const config = this.config;
     const urls = endpoints(config);
     const replies = new Map(); let inFlight = 0, pending = new Map(), openingSocket = true;
-    const transportError = error => {
-      const code = error?.code ?? error?.data?.errorCode;
+    let stage = 'AUTH';
+    const transportError = (error, at = stage) => {
+      const code = transportCode(error);
       const denied = ['PERMISSION_DENIED', 'UNSUPPORTED', 'DOMAIN_NOT_ALLOWED'].includes(code);
-      this.fail(generation, denied ? 'protocol_incompatible' : 'network_error', !denied, denied ? 'HOST_API_OR_PERMISSION_UNAVAILABLE' : 'HOST_NETWORK_ERROR');
+      this.fail(generation, denied ? 'protocol_incompatible' : 'network_error', !denied, `${at}:${code}`);
     };
     const send = async payload => {
       if (!this.alive(generation) || !this.socketId) return;
@@ -113,7 +117,7 @@ class Connector {
         if (frame.method === 'runtime.discover' && response.ok) {
           this.cancelTimer(discoveryTimer); this.state = 'online'; this.attempts = 0;
         }
-      } catch (error) { transportError(error); }
+      } catch (error) { transportError(error, 'RPC_SEND'); }
       finally { inFlight--; }
     };
     const handle = (kind, event) => {
@@ -133,7 +137,7 @@ class Connector {
       }
       if (event.socketId !== this.socketId) return;
       if (kind === 'message') { void processFrame(event); return; }
-      if (kind === 'error') { transportError(null); return; }
+      if (kind === 'error') { transportError(event.error ?? event, 'WS_EVENT'); return; }
       const code = Number.isInteger(event.code) ? event.code : 0;
       const fatal = code === 4001 && /connector/i.test(event.reason || '') && /invalid|revoked|deleted|credential/i.test(event.reason || '');
       this.fail(generation, fatal ? 'authentication_failed' : code === 4409 ? 'ownership_conflict' : 'reconnecting', !fatal && code !== 4409, `WS_CLOSE_${code}`);
@@ -158,12 +162,14 @@ class Connector {
         const event = `net:websocket:${kind}`, listener = data => handle(kind, data);
         this.pi.events.on(event, listener); this.listeners.push([event, listener]);
       }
+      stage = 'WS_CONNECT';
       this.log('websocket_connect', urls.ws);
       const connection = await this.pi.net.websocket.connect({ url: urls.ws, headers: { Authorization: `Bearer ${auth.accessToken}`, 'X-Device-OS': this.platform === 'win32' ? 'windows' : this.platform === 'darwin' ? 'macos' : 'linux' }, timeoutMs: 10000 });
       auth = null;
       if (!this.alive(generation)) { this.close(connection?.socketId); return; }
       if (typeof connection?.socketId !== 'string' || !connection.socketId) { this.fail(generation, 'protocol_incompatible', false, 'INVALID_SOCKET_HANDLE'); return; }
       this.socketId = connection.socketId; openingSocket = false;
+      stage = 'RPC';
       this.log('websocket_open', 'Awaiting runtime discovery; phone visibility is not yet verified.');
       discoveryTimer = this.timer(() => this.fail(generation, 'protocol_incompatible', false, 'RUNTIME_DISCOVERY_TIMEOUT'), 30000);
       const early = pending.get(this.socketId); pending.clear();
@@ -174,7 +180,7 @@ class Connector {
         try {
           await send({ type: 'notification', method: 'connector.heartbeat', params: {} });
           if (this.alive(generation)) this.timer(() => { void heartbeat(); }, 20000);
-        } catch (error) { transportError(error); }
+        } catch (error) { transportError(error, 'HEARTBEAT'); }
       };
       await heartbeat();
     } catch (error) { transportError(error); }

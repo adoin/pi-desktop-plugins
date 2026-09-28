@@ -33,7 +33,7 @@ function fixture(overrides = {}) {
 }
 
 test('manifest pins preview version, exact minimal permissions and bilingual install disclosures', () => {
-  assert.equal(manifest.id, 'pi.agents-anywhere'); assert.equal(manifest.version, '2.0.0-alpha.2');
+  assert.equal(manifest.id, 'pi.agents-anywhere'); assert.equal(manifest.version, '2.0.0-alpha.3');
   assert.deepEqual(manifest.permissions, ['ui.panel', 'ui.view', 'net.fetch', 'net.websocket', 'background.service']);
   assert.deepEqual(manifest.net.domains, ['web.agents-anywhere.com']);
   for (const locale of ['en', 'zh-CN']) { for (const key of ['name', 'description', 'safetyNotes']) assert.ok(manifest.i18n[locale][key]); assert.ok(manifest.ui.title[locale]); }
@@ -153,6 +153,9 @@ test('plugin load is offline; consent is required and unload unregisters all res
   try {
     await main.onLoad(); assert.equal(f.requests.length, 0); assert.equal((await main.onPanelInvoke('anywhere.status')).state, 'unconfigured');
     await assert.rejects(main.onPanelInvoke('anywhere.connect', { ...config(), consent: false }), { code: 'CONSENT_REQUIRED' });
+    const diagnosticState = await main.onPanelInvoke('anywhere.status');
+    assert.ok(diagnosticState.logs.some(entry => entry.event === 'connect_received'));
+    assert.ok(diagnosticState.logs.some(entry => entry.event === 'configuration_rejected' && entry.detail === 'CONSENT_REQUIRED'));
     await assert.rejects(main.onPanelInvoke('session.send_message', {}), { code: 'UNSUPPORTED' });
     await main.onUnload(); assert.equal(commands.size, 0); assert.equal(services.size, 0);
   } finally { globalThis.pi = previous; }
@@ -190,4 +193,28 @@ test('active early buffer and concurrent request floods are bounded', async () =
   for (let i = 0; i < 17; i++) s.events.emit('net:websocket:message', { socketId: s.client.socketId, data: JSON.stringify({ type: 'request', id: String(i), method: 'runtime.discover', params: {} }) });
   assert.equal(s.client.state, 'protocol_incompatible'); for (const resolve of pending) resolve(); await flush();
   assert.equal(s.client.state, 'protocol_incompatible'); assert.equal(s.timers.size, 0);
+});
+
+test('network diagnostics categorize errors without returning secret-bearing messages', () => {
+  const { transportCode } = require(`${root}src/diagnostics.js`);
+  const token = secret();
+  for (const [input, expected] of [
+    [{ cause: { code: 'ENOTFOUND' }, message: token }, 'DNS_FAILURE'],
+    [{ message: `certificate rejected ${token}` }, 'TLS_FAILURE'],
+    [{ message: `ETIMEDOUT ${token}` }, 'TIMEOUT'],
+    [{ code: 'ECONNREFUSED', message: token }, 'CONNECTION_REFUSED'],
+    [{ code: 'ECONNRESET', message: token }, 'CONNECTION_RESET'],
+    [{ message: `proxy connection failed ${token}` }, 'PROXY_FAILURE'],
+    [{ message: `Unexpected server response: 401 ${token}` }, 'HTTP_401'],
+    [{ data: { errorCode: 'PERMISSION_DENIED' }, message: token }, 'PERMISSION_DENIED'],
+    [{ message: token }, 'HOST_NETWORK_ERROR'],
+  ]) { assert.equal(transportCode(input), expected); assert.ok(!transportCode(input).includes(token)); }
+});
+test('transport logs identify auth and WS failure stages', async () => {
+  const a = fixture({ fetch: async () => { throw Object.assign(new Error(secret()), { cause: { code: 'ENOTFOUND' } }); } });
+  a.client.connect(config()); await a.client.opening;
+  assert.ok(a.client.logs.some(entry => entry.detail === 'AUTH:DNS_FAILURE')); a.client.disconnect();
+  const w = fixture({ connect: async () => { throw new Error(`certificate failed ${secret()}`); } });
+  w.client.connect(config()); await w.client.opening;
+  assert.ok(w.client.logs.some(entry => entry.detail === 'WS_CONNECT:TLS_FAILURE')); w.client.disconnect();
 });

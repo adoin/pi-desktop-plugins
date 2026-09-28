@@ -13,8 +13,8 @@ class Element {
   replaceChildren() { this.children = []; }
   appendChild(child) { this.children.push(child); }
 }
-function fixture(override) {
-  const ids = ['connect', 'disconnect', 'parse', 'refresh', 'consent', 'connection', 'profile', 'message', 'logs', 'state', 'discovered', 'running', 'serverUrl', 'connectorId', 'connectorToken', 'command'];
+function fixture(override, options = {}) {
+  const ids = ['connect', 'disconnect', 'parse', 'refresh', 'diagnostics', 'report', 'consent', 'connection', 'profile', 'message', 'logs', 'state', 'discovered', 'running', 'serverUrl', 'connectorId', 'connectorToken', 'command'];
   const nodes = Object.fromEntries(ids.map(id => [id, new Element()]));
   nodes.profile.value = 'current'; nodes.profile.options = [new Element('current'), new Element('legacy')];
   Object.defineProperty(nodes.profile, 'selectedOptions', { get: () => nodes.profile.options.filter(option => option.value === nodes.profile.value) });
@@ -22,7 +22,7 @@ function fixture(override) {
   nodes.connection.querySelectorAll = () => fields;
   const buttons = ['connect', 'disconnect', 'parse', 'refresh'].map(id => nodes[id]);
   for (const id of ['connect', 'disconnect', 'parse', 'refresh']) nodes[id].dataset.i18n = id;
-  const callbacks = new Map(), intervals = new Map(), calls = [];
+  const callbacks = new Map(), intervals = new Map(), deadlines = new Map(), calls = []; let deadlineId = 0;
   const status = { state: 'unconfigured', serverUrl: 'https://web.agents-anywhere.com', connectorId: '', profile: 'current', runtime: { discovered: false, running: false }, profiles: [{ id: 'current', enabled: true, label: 'Current', baseline: '' }, { id: 'legacy', enabled: false, label: 'Legacy', baseline: '' }], logs: [] };
   const window = { addEventListener: (event, fn) => callbacks.set(event, fn), pluginBridge: { invoke: async (method, args) => {
     calls.push({ method, args });
@@ -32,8 +32,9 @@ function fixture(override) {
     throw new Error('Fixture method unavailable');
   } } };
   window.__appearance = { onLocaleChange: fn => callbacks.set('locale', fn), init: () => {} };
-  runInNewContext(source, { window, document: { documentElement: { lang: 'en' }, hidden: false, getElementById: id => nodes[id], createElement: () => new Element(), querySelectorAll: () => buttons }, setInterval: fn => { intervals.set(1, fn); return 1; }, clearInterval: id => intervals.delete(id) });
-  return { nodes, calls, status, callbacks, intervals };
+  if (options.noBridge) delete window.pluginBridge;
+  runInNewContext(source, { window, document: { documentElement: { lang: 'en' }, hidden: false, getElementById: id => nodes[id], createElement: () => new Element(), querySelectorAll: () => buttons }, setTimeout: (fn, ms) => { const id = ++deadlineId; deadlines.set(id, { fn, ms }); return id; }, clearTimeout: id => deadlines.delete(id), setInterval: fn => { intervals.set(1, fn); return 1; }, clearInterval: id => intervals.delete(id) });
+  return { nodes, calls, status, callbacks, intervals, deadlines };
 }
 test('renderer blocks connect without consent, invalidates consent on edits and disables legacy', async () => {
   const f = fixture(); await flush(); const n = f.nodes;
@@ -80,7 +81,7 @@ test('host locale changes translate controls, profiles, logs and known errors wi
   assert.equal(f.nodes.connect.textContent, '连接');
   assert.equal(f.nodes.profile.options[0].textContent, '新版（默认）');
   assert.match(f.nodes.profile.options[1].textContent, /不支持 Pi/);
-  assert.match(f.nodes.logs.children[0].textContent, /身份验证 HTTP 状态.*401/);
+  assert.ok(f.nodes.logs.children.some(node => /身份验证 HTTP 状态.*401/.test(node.textContent)));
   assert.equal(f.nodes.state.textContent, '未配置');
   f.nodes.command.value = 'invalid'; f.nodes.parse.emit('click'); await flush();
   assert.match(f.nodes.message.textContent, /无法解析命令/);
@@ -88,7 +89,7 @@ test('host locale changes translate controls, profiles, logs and known errors wi
   assert.equal(f.nodes.connect.textContent, 'Connect');
   assert.equal(f.nodes.profile.options[0].textContent, 'Current (default)');
   assert.match(f.nodes.message.textContent, /Cannot parse the command/);
-  assert.match(f.nodes.logs.children[0].textContent, /Authentication HTTP status.*401/);
+  assert.ok(f.nodes.logs.children.some(node => /Authentication HTTP status.*401/.test(node.textContent)));
   assert.equal(f.nodes.connectorToken.value, token); assert.equal(f.nodes.profile.value, 'current');
   assert.equal(f.nodes.profile.options[1].disabled, true); f.callbacks.get('pagehide')();
 });
@@ -119,4 +120,38 @@ test('panel styling supports both themes, narrow screens, focus and reduced moti
   assert.match(css, /data-state="online"/); assert.match(css, /data-state="network_error"/);
   assert.match(css, /var\(--pi-plugin-titlebar-height, 46px\)/);
   assert.doesNotMatch(css, /https?:\/\//);
+});
+
+test('missing bridge still produces local logs and a credential-free diagnostic report', async () => {
+  const f = fixture(undefined, { noBridge: true }); await flush();
+  assert.ok(f.nodes.logs.children.some(node => /Panel ready/.test(node.textContent)));
+  assert.ok(f.nodes.logs.children.some(node => /bridge_unavailable/.test(node.textContent)));
+  const secret = randomUUID(); f.nodes.connectorToken.value = secret; f.nodes.command.value = secret; f.nodes.connectorId.value = secret;
+  f.nodes.diagnostics.emit('click');
+  assert.match(f.nodes.report.value, /Bridge: missing/); assert.match(f.nodes.report.value, /anywhere.status:bridge_unavailable/);
+  assert.ok(!f.nodes.report.value.includes(secret)); assert.equal(f.nodes.diagnostics.disabled, false);
+  f.callbacks.get('pagehide')();
+});
+test('bridge timeout is logged and diagnostic export works while a request is pending', async () => {
+  const f = fixture(method => method === 'anywhere.status' ? new Promise(() => {}) : undefined); await flush();
+  assert.equal(f.nodes.diagnostics.disabled, false); f.nodes.diagnostics.emit('click'); assert.match(f.nodes.report.value, /panel_ready/);
+  const timeout = [...f.deadlines.values()][0]; assert.equal(timeout.ms, 6000); timeout.fn(); await flush();
+  assert.match(f.nodes.message.textContent, /bridge_timeout/);
+  f.nodes.diagnostics.emit('click'); assert.match(f.nodes.report.value, /anywhere.status:bridge_timeout/);
+  assert.equal(f.deadlines.size, 0); f.callbacks.get('pagehide')();
+});
+test('rejected connect and native invalid fields leave panel evidence without input values', async () => {
+  const secret = randomUUID(); const f = fixture(method => { if (method === 'anywhere.connect') throw Object.assign(new Error(secret), { code: 'PERMISSION_DENIED' }); }); await flush();
+  f.nodes.connectorToken.value = secret; f.nodes.consent.checked = true; f.nodes.connection.emit('submit'); await flush();
+  f.nodes.connection.handlers.get('invalid')({ target: { id: 'connectorToken' } });
+  f.nodes.diagnostics.emit('click'); assert.match(f.nodes.report.value, /anywhere.connect:permission_denied/);
+  assert.match(f.nodes.report.value, /form_invalid: connectorToken/); assert.ok(!f.nodes.report.value.includes(secret));
+  f.callbacks.get('pagehide')();
+});
+test('diagnostic reports preserve known network categories but omit arbitrary backend detail', async () => {
+  const f = fixture(); await flush(); const secret = randomUUID();
+  f.status.logs = [{ event: 'network_error', detail: 'WS_CONNECT:TLS_FAILURE' }, { event: 'network_error', detail: secret }, { event: 'auth_http', detail: '401' }];
+  f.intervals.get(1)(); await flush(); f.nodes.diagnostics.emit('click');
+  assert.match(f.nodes.report.value, /WS_CONNECT:TLS_FAILURE/); assert.match(f.nodes.report.value, /auth_http: 401/);
+  assert.ok(!f.nodes.report.value.includes(secret)); f.callbacks.get('pagehide')();
 });

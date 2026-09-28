@@ -1,9 +1,28 @@
 # Agents Anywhere — connection preview
 
-Version: **2.0.0-alpha.2**. Development-only Phase 2 checkpoint, not a full remote
+Version: **2.0.0-alpha.3**. Development-only Phase 2 checkpoint, not a full remote
 chat release. Cloud/device visibility has **not** been verified with real
 credentials. Do not interpret the alpha package or passing tests as release
 approval.
+
+The alpha.3 diagnostic update makes failures before networking visible. Open
+Connection events, choose **Generate diagnostic report**, then copy the selected
+report with Ctrl+C. It works even if the panel cannot contact the plugin process.
+The report includes panel/backend versions, bridge availability and bounded
+sanitized events, but no connector ID, token or pasted command. Logs remain in
+memory only and are lost when the corresponding panel/plugin is closed/reloaded.
+
+`panel_ready` confirms the script ran; `bridge_failure` identifies a missing,
+denied or timed-out host call; `connect_received` confirms the backend received
+Connect; `configuration_rejected` means no network request was attempted.
+Transport details distinguish `AUTH`, `WS_CONNECT`, `WS_EVENT`, `RPC_SEND` and
+`HEARTBEAT` stages with fixed categories such as DNS_FAILURE, TLS_FAILURE and
+TIMEOUT. These are diagnostic classifications, not a proven root cause. A bridge
+timeout does not cancel a host operation already delivered: inspect status and
+avoid repeatedly submitting Connect. No mutation is retried by the panel.
+
+If the event list remains at the bilingual "Panel initializing" placeholder,
+the script has not initialized; reload the plugin and check host loading errors.
 
 The alpha.2 visual refresh adds coordinated teal light/dark palettes, semantic
 status colors, responsive cards, keyboard focus styling and reduced-motion

@@ -39,7 +39,14 @@
       <p id="message" role="alert"></p>
     </form>
     <section class="card notes"><h2 data-i18n="boundaries">Preview boundaries</h2><p data-i18n="security">No automatic protocol downgrade. Tokens are not stored. Self-hosted servers require an explicit manifest host allowlist; wildcards are not supported.</p><p data-i18n="verification">Current protocol is tested offline, not Cloud-proven. Legacy v0.1.7 cannot register Pi and is disabled. No session sharing or chat yet.</p></section>
-    <section class="card logs-card"><h2 data-i18n="logs">Connection events</h2><p data-i18n="logPrivacy">Only recognized event codes and bounded diagnostic details are shown; credentials are excluded.</p><ul id="logs"></ul></section>
+    <section class="card logs-card">
+      <div class="row"><h2 data-i18n="logs">Connection events</h2><button id="diagnostics" type="button" data-i18n="diagnostics">Generate diagnostic report / 生成诊断报告</button></div>
+      <p data-i18n="logPrivacy">Only recognized event codes and bounded diagnostic details are shown; credentials are excluded.</p>
+      <ul id="logs"><li>Panel initializing. Reload the plugin if this persists. / 面板初始化中，若长时间不变请重新加载插件。</li></ul>
+      <label for="report" data-i18n="reportLabel">Diagnostic report / 诊断报告</label>
+      <textarea id="report" rows="9" readonly hidden spellcheck="false"></textarea>
+      <p data-i18n="reportHint">Select and copy with Ctrl+C. No credentials are included. / 全选后按 Ctrl+C 复制，不含凭据。</p>
+    </section>
   </main>
   <script src="./appearance.js"></script>
   <script src="./panel.js"></script>

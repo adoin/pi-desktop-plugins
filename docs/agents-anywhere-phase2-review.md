@@ -177,3 +177,45 @@ SHA-256: `910392bda8d92f54cb5a4045d6a1140358a5f0d0601d3b9b0762dadc6ba434a0`.
 Generated catalog hash and size match. This local feature-branch checkpoint
 does not waive any of the Cloud, legacy, redirect-security or maintainer-approval
 gates above and has not been pushed or published.
+
+## Diagnostic follow-up: 2.0.0-alpha.3
+
+The user reported a connection failure with an empty event list. No actual
+failure trace was available, so this update does not claim to fix its root cause.
+Source inspection confirmed the existing onPanelInvoke calling convention, but
+identified an observability gap: pre-network validation and panel/host failures
+did not populate the Connector-only event list.
+
+The renderer now maintains an independent bounded event buffer with an HTML
+initialization fallback, script-ready event, host-call failures, six-second call
+deadline, native form-invalid events and a manually copyable diagnostic report.
+The report remains available while status calls are pending or rejected. Repeated
+poll errors are coalesced for ten seconds. The backend logs load, received Connect
+and configuration rejection, and classifies transport errors by AUTH/WS/RPC/send/
+heartbeat stage without returning exception bodies. The report includes explicit
+panel/backend versions and bridge availability, but not connector ID, token,
+command text or arbitrary backend detail. Logs remain in memory only; no new
+permissions, clipboard API, file writes, telemetry or network destinations.
+
+The call deadline does not cancel a host operation already delivered. No mutating
+call is replayed automatically; the UI/README warn against repeated Connect after
+a timeout. Host permission failures remain fail-closed. Error categories are
+diagnostic evidence, not a claim that a specific DNS/TLS/proxy problem was proven.
+
+Verification: 43/43 targeted checks passed, including missing bridge, bridge
+timeout, rejected Connect, form validation, safe report generation and transport
+classification. A real file-page BrowserPreview without pluginBridge displayed
+Chinese bridge-unavailable events; the diagnostic report generated and selected
+successfully. This is not evidence about the user's installed plugin connection.
+Full suite: 221 tests, 215 passed, the same 6 baseline failures. Scoped security:
+0 blockers, 10 review signals; full package security: the same 342 pre-existing
+blockers and no new Anywhere blocker. Existing publication gates remain pending.
+
+PluginPack succeeded with its previously recorded warnings. The 13-file stored
+archive was compared byte-for-byte with source, checked for unsafe entries and
+matched to the generated catalog; unrelated catalog entries were unchanged.
+Artifact: `packages/pi.agents-anywhere-2.0.0-alpha.3.piplug`, 81,667 bytes.
+SHA-256: `33266a3cd0160fd8338d35f04921da4b05fed111e1f0f95a8d1d5575f373b294`.
+No real credentials were read, no Cloud connection attempted, and nothing pushed
+or published. Next step: install/reload alpha.3, attempt one connection, then
+generate and share only the sanitized diagnostic report.

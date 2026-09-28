@@ -58,8 +58,28 @@
       unavailable: '插件或宿主暂不可用，请重新加载插件并检查权限。'
     }
   };
+  Object.assign(words.en, {
+    diagnostics: 'Generate diagnostic report', reportLabel: 'Diagnostic report (select and copy)',
+    reportHint: 'Copy this report with Ctrl+C. No token, connector ID or pasted command is included. Logs last only for this panel/plugin run.',
+    panel_ready: 'Panel ready', bridge_request: 'Calling plugin', bridge_failure: 'Panel-to-plugin call failed',
+    status_received: 'Plugin status received', panel_error: 'Panel operation failed', form_invalid: 'Required form field is invalid',
+    plugin_loaded: 'Plugin process loaded', connect_received: 'Plugin received connection request', configuration_rejected: 'Configuration rejected',
+    bridge_timeout: 'Plugin communication timed out. Reload the plugin and review its permissions. Do not repeatedly submit the connection request.',
+    permission_denied: 'The host denied permission. Reload the plugin and approve the declared permissions.',
+    not_found: 'Plugin operation was not found. Check that the installed package and panel versions match.'
+  });
+  Object.assign(words['zh-CN'], {
+    diagnostics: '生成诊断报告', reportLabel: '诊断报告（可全选复制）',
+    reportHint: '按 Ctrl+C 复制报告。报告不含令牌、连接器 ID 或粘贴的命令。日志仅保留于本次面板/插件运行期间。',
+    panel_ready: '面板已就绪', bridge_request: '正在调用插件', bridge_failure: '面板与插件通信失败',
+    status_received: '已收到插件状态', panel_error: '面板操作失败', form_invalid: '必填字段格式不正确',
+    plugin_loaded: '插件主进程已加载', connect_received: '插件已收到连接请求', configuration_rejected: '配置校验未通过',
+    bridge_timeout: '插件通信超时，请重新加载插件并检查权限，不要连续重复提交连接请求。',
+    permission_denied: '宿主拒绝了权限，请重新加载插件并授权已声明的权限。',
+    not_found: '未找到插件操作，请检查安装包与面板是否为同一版本。'
+  });
   const states = new Set(['unconfigured', 'connecting', 'online', 'reconnecting', 'authentication_failed', 'protocol_incompatible', 'network_error', 'disconnected', 'ownership_conflict']);
-  const errorCodes = new Set(['authentication_failed', 'protocol_incompatible', 'network_error', 'ownership_conflict', 'request_failed', 'bridge_unavailable', 'invalid_response', 'consent_required', 'invalid_config', 'invalid_command', 'insecure_origin', 'domain_not_allowed', 'profile_unavailable', 'unsupported', 'unavailable']);
+  const errorCodes = new Set(['authentication_failed', 'protocol_incompatible', 'network_error', 'ownership_conflict', 'request_failed', 'bridge_unavailable', 'bridge_timeout', 'permission_denied', 'not_found', 'invalid_response', 'consent_required', 'invalid_config', 'invalid_command', 'insecure_origin', 'domain_not_allowed', 'profile_unavailable', 'unsupported', 'unavailable']);
   let locale = document.documentElement.lang === 'zh-CN' ? 'zh-CN' : 'en';
   let status = null;
   let firstStatus = true;
@@ -69,13 +89,58 @@
   let queue = Promise.resolve();
   const text = (key) => words[locale][key] || words[locale].unknown;
   const fail = (code) => Object.assign(new Error(code), { code });
+  const PANEL_VERSION = '2.0.0-alpha.3';
+  const localLogs = [];
+  const events = new Set(['panel_ready', 'bridge_request', 'bridge_failure', 'status_received', 'panel_error', 'form_invalid', 'plugin_loaded', 'connect_received', 'configuration_rejected', 'protocol', 'auth_request', 'auth_http', 'websocket_connect', 'websocket_open', 'rpc', 'retry_scheduled', ...states]);
+  function safeCode(error) {
+    const code = error?.code ?? error?.errorCode ?? error?.data?.errorCode;
+    if (typeof code === 'string' && errorCodes.has(code.toLowerCase())) return code.toLowerCase();
+    const messageCode = typeof error?.message === 'string' ? error.message.match(/\b(PERMISSION_DENIED|UNSUPPORTED|UNAVAILABLE|NOT_FOUND)\b/)?.[1]?.toLowerCase() : '';
+    return errorCodes.has(messageCode) ? messageCode : 'request_failed';
+  }
+  function localLog(event, detail = '') {
+    if (closed) return;
+    const previous = localLogs.find(entry => entry.event === event && entry.detail === detail);
+    if (['bridge_failure', 'panel_error'].includes(event) && previous && Date.now() - Date.parse(previous.time) < 10000) return;
+    localLogs.unshift({ time: new Date().toISOString(), event, detail, source: 'panel' });
+    localLogs.length = Math.min(localLogs.length, 80);
+    render();
+  }
+  function safeEntry(entry, source) {
+    const event = events.has(entry?.event) ? entry.event : 'event';
+    const time = typeof entry?.time === 'string' && /^\d{4}-\d{2}-\d{2}T[\d:.Z+-]{8,24}$/.test(entry.time) ? entry.time : '';
+    const value = typeof entry?.detail === 'string' ? entry.detail : '';
+    const fixed = new Set(['FRAME_LIMIT', 'INVALID_JSON', 'INVALID_RPC_FRAME', 'REQUEST_LIMIT', 'RPC_ID_REUSED', 'HOST_NETWORK_ERROR', 'HOST_API_OR_PERMISSION_UNAVAILABLE', 'INVALID_HTTP_RESPONSE', 'INVALID_AUTH_RESPONSE', 'INVALID_AUTH_JSON', 'INVALID_AUTH_FIELDS', 'INVALID_SOCKET_HANDLE', 'RUNTIME_DISCOVERY_TIMEOUT', 'EARLY_EVENT_LIMIT', 'VERSION_UNKNOWN', ...[...errorCodes].map(code => code.toUpperCase())]);
+    const allowed = /^(?:\d{1,5}(?:ms)?|\d+\.\d+\.\d+(?:-alpha\.\d+)?|WS_CLOSE_\d{1,4}|HTTP_\d{3}|(?:current|legacy):[a-f0-9]{40}|(?:runtime\.(?:discover|configSchema|config|validateConfig|start|stop|capabilities)|unsupported_method):(?:ok|invalid_params|runtime_conflict|runtime_not_found|runtime_not_running|method_not_found|internal_error)|(?:AUTH|WS_CONNECT|WS_EVENT|RPC_SEND|RPC|HEARTBEAT):(?:PERMISSION_DENIED|DOMAIN_NOT_ALLOWED|UNSUPPORTED|DNS_FAILURE|TLS_FAILURE|TIMEOUT|CONNECTION_REFUSED|CONNECTION_RESET|PROXY_FAILURE|HOST_NETWORK_ERROR|HTTP_\d{3}))$/;
+    const bridge = value.match(/^(app\.getAppearance|anywhere\.(?:status|parse|connect|disconnect))(?::([a-z_]+))?$/);
+    const field = event === 'form_invalid' && ['serverUrl', 'connectorId', 'connectorToken'].includes(value);
+    const endpoint = ['auth_request', 'websocket_connect'].includes(event) && /^(?:https?|wss?):\/\/[A-Za-z0-9.:[\]-]+\/(?:api\/v2\/)?connector\/(?:auth|ws)$/.test(value);
+    const detail = value.length <= 4096 && (fixed.has(value) || allowed.test(value) || (bridge && (!bridge[2] || errorCodes.has(bridge[2]))) || field || endpoint) ? value : '';
+    return { time, event, detail, source };
+  }
+  function entries() {
+    return [...localLogs.map(entry => safeEntry(entry, 'panel')), ...(Array.isArray(status?.logs) ? status.logs.slice(0, 80).map(entry => safeEntry(entry, 'plugin')) : [])].sort((a, b) => b.time.localeCompare(a.time)).slice(0, 120);
+  }
+  function report() {
+    const backend = typeof status?.pluginVersion === 'string' && /^\d+\.\d+\.\d+(?:-alpha\.\d+)?$/.test(status.pluginVersion) ? status.pluginVersion : 'unknown';
+    return [`Agents Anywhere diagnostic report`, `Panel: ${PANEL_VERSION}`, `Plugin: ${backend}`, `Bridge: ${typeof window.pluginBridge?.invoke === 'function' ? 'present' : 'missing'}`, `State: ${states.has(status?.state) ? status.state : 'unknown'}`, 'Credentials and command text excluded.', '', ...entries().map(entry => `${entry.time} [${entry.source}] ${entry.event}${entry.detail ? `: ${entry.detail}` : ''}`)].join('\n');
+  }
 
   // Serialize all host calls, including the shared appearance adapter's pulls.
   function invoke(method, args = {}) {
     const next = queue.then(async () => {
       if (closed) throw fail('request_failed');
-      if (!window.pluginBridge?.invoke) throw fail('bridge_unavailable');
-      return window.pluginBridge.invoke(method, args);
+      if (method !== 'anywhere.status' && method !== 'app.getAppearance') localLog('bridge_request', method);
+      let deadline;
+      try {
+        if (!window.pluginBridge?.invoke) throw fail('bridge_unavailable');
+        return await Promise.race([
+          Promise.resolve().then(() => window.pluginBridge.invoke(method, args)),
+          new Promise((_, reject) => { deadline = setTimeout(() => reject(fail('bridge_timeout')), 6000); })
+        ]);
+      } catch (error) {
+        const code = safeCode(error); localLog('bridge_failure', `${method}:${code}`); throw fail(code);
+      } finally { clearTimeout(deadline); }
     });
     queue = next.catch(() => {});
     return next;
@@ -83,6 +148,7 @@
 
   function controls() {
     document.querySelectorAll('button').forEach((button) => { button.disabled = busy || closed; });
+    $('diagnostics').disabled = closed;
     // Keep status polling from disrupting typing; freeze fields only during user actions.
     $('connect').disabled = busy || closed || !$('consent').checked || !status ||
       !$('profile').selectedOptions[0] || $('profile').selectedOptions[0].disabled;
@@ -109,14 +175,10 @@
     // Do not change the selected profile automatically, including on incompatibility.
     $('message').textContent = message ? `${text(message)} [${message}]` : '';
     $('logs').replaceChildren();
-    const logs = Array.isArray(status?.logs) ? status.logs.slice(0, 40) : [];
+    const logs = entries();
     for (const entry of logs) {
       const item = document.createElement('li');
-      const events = new Set(['protocol', 'auth_request', 'auth_http', 'websocket_connect', 'websocket_open', 'rpc', 'retry_scheduled', ...states]);
-      const code = events.has(entry?.event) ? entry.event : 'event';
-      const time = typeof entry?.time === 'string' && /^\d{4}-\d{2}-\d{2}T[\d:.Z+-]{8,24}$/.test(entry.time) ? entry.time : '';
-      const detail = typeof entry?.detail === 'string' && /^(?:\d{1,5}(?:ms)?|WS_CLOSE_\d{1,4}|[A-Z_]{1,64}|(?:current|legacy):[a-f0-9]{40}|(?:runtime\.(?:discover|configSchema|config|validateConfig|start|stop|capabilities)|unsupported_method):[a-z_]+)$/.test(entry.detail) ? entry.detail : '';
-      item.textContent = `${time ? `${time} · ` : ''}${text(code)}${detail ? ` · ${detail}` : ''}`;
+      item.textContent = `${entry.time ? `${entry.time} · ` : ''}${text(entry.event)}${entry.detail ? ` · ${entry.detail}` : ''}`;
       $('logs').appendChild(item);
     }
     if (!logs.length) {
@@ -134,6 +196,7 @@
     status = result;
     if (firstStatus) {
       firstStatus = false;
+      localLog('status_received', typeof result.pluginVersion === 'string' ? result.pluginVersion : 'VERSION_UNKNOWN');
       if (typeof result.serverUrl === 'string' && !$('serverUrl').dataset.edited) $('serverUrl').value = result.serverUrl || 'https://web.agents-anywhere.com';
       if (typeof result.connectorId === 'string' && !$('connectorId').dataset.edited) $('connectorId').value = result.connectorId;
       if (['current', 'legacy'].includes(result.profile) && !$('profile').dataset.edited) $('profile').value = result.profile;
@@ -150,8 +213,8 @@
     try {
       await task();
     } catch (error) {
-      const code = typeof error?.code === 'string' ? error.code.toLowerCase() : '';
-      message = errorCodes.has(code) ? code : 'request_failed';
+      message = safeCode(error);
+      localLog('panel_error', message.toUpperCase());
     } finally {
       if (freeze) fields.forEach((field) => { field.disabled = false; });
       busy = false;
@@ -160,6 +223,13 @@
   }
 
   $('consent').addEventListener('change', controls);
+  $('connection').addEventListener('invalid', event => {
+    const field = event.target?.id;
+    localLog('form_invalid', ['serverUrl', 'connectorId', 'connectorToken'].includes(field) ? field : 'INVALID_CONFIG');
+  }, true);
+  $('diagnostics').addEventListener('click', () => {
+    $('report').hidden = false; $('report').value = report(); $('report').focus?.(); $('report').select?.();
+  });
   for (const id of ['serverUrl', 'connectorId', 'connectorToken', 'profile', 'command']) {
     $(id).addEventListener('input', () => {
       $(id).dataset.edited = 'true';
@@ -216,6 +286,7 @@
     invoke,
     on: (event, listener) => window.pluginBridge?.on?.(event, (value) => { if (!closed) listener(value); })
   });
+  localLog('panel_ready', PANEL_VERSION);
   render();
   void action(refresh);
   const timer = setInterval(() => { if (!closed && !document.hidden) void action(refresh); }, 2000);
