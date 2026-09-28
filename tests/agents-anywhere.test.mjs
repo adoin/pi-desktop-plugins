@@ -33,7 +33,7 @@ function fixture(overrides = {}) {
 }
 
 test('manifest pins preview version, exact minimal permissions and bilingual install disclosures', () => {
-  assert.equal(manifest.id, 'pi.agents-anywhere'); assert.equal(manifest.version, '2.0.0-alpha.3');
+  assert.equal(manifest.id, 'pi.agents-anywhere'); assert.equal(manifest.version, '2.0.0-alpha.4');
   assert.deepEqual(manifest.permissions, ['ui.panel', 'ui.view', 'net.fetch', 'net.websocket', 'background.service']);
   assert.deepEqual(manifest.net.domains, ['web.agents-anywhere.com']);
   for (const locale of ['en', 'zh-CN']) { for (const key of ['name', 'description', 'safetyNotes']) assert.ok(manifest.i18n[locale][key]); assert.ok(manifest.ui.title[locale]); }
@@ -217,4 +217,11 @@ test('transport logs identify auth and WS failure stages', async () => {
   const w = fixture({ connect: async () => { throw new Error(`certificate failed ${secret()}`); } });
   w.client.connect(config()); await w.client.opening;
   assert.ok(w.client.logs.some(entry => entry.detail === 'WS_CONNECT:TLS_FAILURE')); w.client.disconnect();
+});
+
+test('parsing self-hosted commands does not grant network access', () => {
+  const input = config();
+  const parsed = parseCommand(`uvx anywhere-cli start --server-url https://anywhere.emssion.com --connector-id ${input.connectorId} --connector-token ${input.connectorToken}`);
+  assert.equal(parsed.connectorId, input.connectorId); assert.equal(parsed.connectorToken, input.connectorToken);
+  assert.throws(() => validateConfig({ ...parsed, consent: true, profile: 'current' }, manifest.net.domains, PROFILES), { code: 'DOMAIN_NOT_ALLOWED' });
 });

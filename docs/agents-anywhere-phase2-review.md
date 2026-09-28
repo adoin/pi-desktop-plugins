@@ -219,3 +219,39 @@ SHA-256: `33266a3cd0160fd8338d35f04921da4b05fed111e1f0f95a8d1d5575f373b294`.
 No real credentials were read, no Cloud connection attempted, and nothing pushed
 or published. Next step: install/reload alpha.3, attempt one connection, then
 generate and share only the sanitized diagnostic report.
+
+## Local parser follow-up: 2.0.0-alpha.4
+
+The user reported that a valid self-hosted CLI command did not fill its ID/token
+fields. A synthetic equivalent reproduced successful parsing in the existing
+pure parser; the supplied real credential was not used. Appending commentary
+directly to the token reproduced an expected validation rejection, but this was
+not assumed to be the user's actual cause. The concrete UI weakness was that
+Parse unnecessarily depended on a working panel-to-plugin call and its busy queue.
+
+The parser now lives in `src/connection-input.js`, shared by the renderer and
+backend. Local parsing needs no bridge, network, host status or domain grant;
+it still rejects ambiguous/invalid input and does not execute pasted text.
+Parse remains available during a stalled status read but not during a mutating
+connection action. Backend connection validation still enforces exact domains,
+consent and profile availability. The manifest allowlist was not expanded.
+An unlisted self-hosted origin can now fill the fields but cannot connect until
+explicitly added to the manifest and re-authorized by the user.
+
+Verification: 46/46 targeted checks passed, including actual shared-parser
+execution in renderer tests, no-bridge/stalled-status extraction, commentary
+rejection, no partial updates and continued domain denial. BrowserPreview with
+no pluginBridge successfully populated origin/ID/token from a synthetic command,
+cleared the command and reset consent. Only booleans were returned; generated
+test fields were then cleared. No connection to the user's server was attempted.
+
+Full suite: 224 tests, 218 passed, same 6 baseline failures. Scoped security:
+0 blockers, 11 manual-review signals; full package check: same 342 pre-existing
+blockers, none for Anywhere. PluginPack passed with previously documented
+warnings. All 14 stored package entries match source bytes and have no unsafe
+paths/symlinks; catalog hash/size match, unrelated catalog entries unchanged.
+Artifact: `packages/pi.agents-anywhere-2.0.0-alpha.4.piplug`, 83,626 bytes.
+SHA-256: `ed926fa29eec4b1e10aa19ef3ef8a34b58cf6593953838a7dd1ff7314b1a4371`.
+The disclosed credential should be revoked/rotated by its owner. It was not
+stored in project files or used for authentication. Existing release gates are
+unchanged; this update has not been pushed or published.

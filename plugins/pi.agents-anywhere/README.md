@@ -1,9 +1,17 @@
 # Agents Anywhere — connection preview
 
-Version: **2.0.0-alpha.3**. Development-only Phase 2 checkpoint, not a full remote
+Version: **2.0.0-alpha.4**. Development-only Phase 2 checkpoint, not a full remote
 chat release. Cloud/device visibility has **not** been verified with real
 credentials. Do not interpret the alpha package or passing tests as release
 approval.
+
+The alpha.4 parser runs entirely in the panel using the same pure input module
+as the backend. Parsing works without a host bridge, during a stalled status
+request, and for syntactically valid self-hosted origins. It never executes the
+command or makes a connection. Copy only the command, not commentary appended
+to the token. Successful extraction clears the pasted command and resets consent.
+Connection still requires an available backend, explicit consent and the exact
+manifest-domain grant; successful parsing is not network authorization.
 
 The alpha.3 diagnostic update makes failures before networking visible. Open
 Connection events, choose **Generate diagnostic report**, then copy the selected

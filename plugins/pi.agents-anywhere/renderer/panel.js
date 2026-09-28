@@ -61,6 +61,8 @@
   Object.assign(words.en, {
     diagnostics: 'Generate diagnostic report', reportLabel: 'Diagnostic report (select and copy)',
     reportHint: 'Copy this report with Ctrl+C. No token, connector ID or pasted command is included. Logs last only for this panel/plugin run.',
+    command_parse: 'Parsing locally', command_parsed: 'Connection fields extracted',
+    parser_unavailable: 'Local parser did not load. Reload or reinstall this plugin package.',
     panel_ready: 'Panel ready', bridge_request: 'Calling plugin', bridge_failure: 'Panel-to-plugin call failed',
     status_received: 'Plugin status received', panel_error: 'Panel operation failed', form_invalid: 'Required form field is invalid',
     plugin_loaded: 'Plugin process loaded', connect_received: 'Plugin received connection request', configuration_rejected: 'Configuration rejected',
@@ -71,6 +73,8 @@
   Object.assign(words['zh-CN'], {
     diagnostics: '生成诊断报告', reportLabel: '诊断报告（可全选复制）',
     reportHint: '按 Ctrl+C 复制报告。报告不含令牌、连接器 ID 或粘贴的命令。日志仅保留于本次面板/插件运行期间。',
+    command_parse: '正在本地解析', command_parsed: '已提取连接参数',
+    parser_unavailable: '本地解析器未加载，请重新加载或安装此插件包。',
     panel_ready: '面板已就绪', bridge_request: '正在调用插件', bridge_failure: '面板与插件通信失败',
     status_received: '已收到插件状态', panel_error: '面板操作失败', form_invalid: '必填字段格式不正确',
     plugin_loaded: '插件主进程已加载', connect_received: '插件已收到连接请求', configuration_rejected: '配置校验未通过',
@@ -80,18 +84,21 @@
   });
   const states = new Set(['unconfigured', 'connecting', 'online', 'reconnecting', 'authentication_failed', 'protocol_incompatible', 'network_error', 'disconnected', 'ownership_conflict']);
   const errorCodes = new Set(['authentication_failed', 'protocol_incompatible', 'network_error', 'ownership_conflict', 'request_failed', 'bridge_unavailable', 'bridge_timeout', 'permission_denied', 'not_found', 'invalid_response', 'consent_required', 'invalid_config', 'invalid_command', 'insecure_origin', 'domain_not_allowed', 'profile_unavailable', 'unsupported', 'unavailable']);
+  errorCodes.add('parser_unavailable');
   let locale = document.documentElement.lang === 'zh-CN' ? 'zh-CN' : 'en';
   let status = null;
   let firstStatus = true;
   let busy = false;
+  let editingLocked = false;
   let closed = false;
   let message = '';
   let queue = Promise.resolve();
   const text = (key) => words[locale][key] || words[locale].unknown;
   const fail = (code) => Object.assign(new Error(code), { code });
-  const PANEL_VERSION = '2.0.0-alpha.3';
+  const PANEL_VERSION = '2.0.0-alpha.4';
   const localLogs = [];
   const events = new Set(['panel_ready', 'bridge_request', 'bridge_failure', 'status_received', 'panel_error', 'form_invalid', 'plugin_loaded', 'connect_received', 'configuration_rejected', 'protocol', 'auth_request', 'auth_http', 'websocket_connect', 'websocket_open', 'rpc', 'retry_scheduled', ...states]);
+  events.add('command_parse'); events.add('command_parsed');
   function safeCode(error) {
     const code = error?.code ?? error?.errorCode ?? error?.data?.errorCode;
     if (typeof code === 'string' && errorCodes.has(code.toLowerCase())) return code.toLowerCase();
@@ -149,6 +156,7 @@
   function controls() {
     document.querySelectorAll('button').forEach((button) => { button.disabled = busy || closed; });
     $('diagnostics').disabled = closed;
+    $('parse').disabled = closed || editingLocked;
     // Keep status polling from disrupting typing; freeze fields only during user actions.
     $('connect').disabled = busy || closed || !$('consent').checked || !status ||
       !$('profile').selectedOptions[0] || $('profile').selectedOptions[0].disabled;
@@ -207,6 +215,7 @@
   async function action(task, freeze = false) {
     if (busy || closed) return;
     busy = true;
+    editingLocked = freeze;
     controls();
     const fields = [...$('connection').querySelectorAll('input, textarea, select')];
     if (freeze) fields.forEach((field) => { field.disabled = true; });
@@ -218,6 +227,7 @@
     } finally {
       if (freeze) fields.forEach((field) => { field.disabled = false; });
       busy = false;
+      editingLocked = false;
       if (!closed) render();
     }
   }
@@ -237,19 +247,23 @@
       controls();
     });
   }
-  $('parse').addEventListener('click', () => action(async () => {
+  $('parse').addEventListener('click', () => {
+    if (closed || editingLocked) return;
     message = '';
-    const result = await invoke('anywhere.parse', { command: $('command').value });
-    if (closed) return;
-    if (!result || !['serverUrl', 'connectorId', 'connectorToken'].every((key) => typeof result[key] === 'string')) throw fail('invalid_response');
-    for (const key of ['serverUrl', 'connectorId', 'connectorToken']) {
-      $(key).value = result[key];
-      $(key).dataset.edited = 'true';
+    localLog('command_parse');
+    try {
+      if (typeof window.AnywhereInput?.parseCommand !== 'function') throw fail('parser_unavailable');
+      const result = window.AnywhereInput.parseCommand($('command').value);
+      for (const key of ['serverUrl', 'connectorId', 'connectorToken']) {
+        $(key).value = result[key]; $(key).dataset.edited = 'true';
+      }
+      $('command').value = ''; $('consent').checked = false;
+      message = 'parsed'; localLog('command_parsed');
+    } catch (error) {
+      message = safeCode(error); localLog('panel_error', message.toUpperCase());
     }
-    $('command').value = '';
-    $('consent').checked = false;
-    message = 'parsed';
-  }, true));
+    render();
+  });
   $('connection').addEventListener('submit', (event) => {
     event.preventDefault();
     if (!$('consent').checked || $('profile').selectedOptions[0]?.disabled) return;

@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { randomUUID } from 'node:crypto';
 const source = readFileSync(new URL('../plugins/pi.agents-anywhere/renderer/panel.js', import.meta.url), 'utf8');
+const parserSource = readFileSync(new URL('../plugins/pi.agents-anywhere/src/connection-input.js', import.meta.url), 'utf8');
 const flush = async () => { for (let i = 0; i < 5; i++) await new Promise(resolve => setImmediate(resolve)); };
 class Element {
   constructor(value = '') { this.value = value; this.dataset = {}; this.disabled = false; this.checked = false; this.handlers = new Map(); this.children = []; this.textContent = ''; }
@@ -33,6 +34,8 @@ function fixture(override, options = {}) {
   } } };
   window.__appearance = { onLocaleChange: fn => callbacks.set('locale', fn), init: () => {} };
   if (options.noBridge) delete window.pluginBridge;
+  if (!options.noParser) runInNewContext(parserSource, { window, URL });
+  if (options.parser) window.AnywhereInput = { parseCommand: options.parser };
   runInNewContext(source, { window, document: { documentElement: { lang: 'en' }, hidden: false, getElementById: id => nodes[id], createElement: () => new Element(), querySelectorAll: () => buttons }, setTimeout: (fn, ms) => { const id = ++deadlineId; deadlines.set(id, { fn, ms }); return id; }, clearTimeout: id => deadlines.delete(id), setInterval: fn => { intervals.set(1, fn); return 1; }, clearInterval: id => intervals.delete(id) });
   return { nodes, calls, status, callbacks, intervals, deadlines };
 }
@@ -51,29 +54,29 @@ test('renderer clears credentials after connection and never echoes arbitrary ex
   n.connection.emit('submit'); await flush(); assert.equal(n.connectorToken.value, ''); assert.equal(n.command.value, ''); assert.equal(n.consent.checked, false);
   assert.equal(f.calls.filter(call => call.method === 'anywhere.connect').length, 1);
   f.callbacks.get('pagehide')(); assert.equal(f.intervals.size, 0);
-  const secret = randomUUID(); const e = fixture(method => { if (method === 'anywhere.parse') throw new Error(secret); }); await flush();
+  const secret = randomUUID(); const e = fixture(undefined, { parser: () => { throw new Error(secret); } }); await flush();
   e.nodes.command.value = 'invalid'; e.nodes.parse.emit('click'); await flush();
   assert.ok(!e.nodes.message.textContent.includes(secret)); assert.match(e.nodes.message.textContent, /request_failed/); e.callbacks.get('pagehide')();
 });
-test('pending parse cannot repopulate token after panel closure; calls are serialized', async () => {
+test('pending connect cannot repopulate token after panel closure; bridge calls are serialized', async () => {
   let resolve;
-  const f = fixture(method => method === 'anywhere.parse' ? new Promise(done => { resolve = done; }) : undefined);
-  await flush(); f.nodes.command.value = 'private command'; f.nodes.parse.emit('click'); await flush();
+  const f = fixture(method => method === 'anywhere.connect' ? new Promise(done => { resolve = done; }) : undefined);
+  await flush(); f.nodes.connectorToken.value = randomUUID(); f.nodes.consent.checked = true; f.nodes.connection.emit('submit'); await flush();
   const before = f.calls.length; f.intervals.get(1)(); await flush(); assert.equal(f.calls.length, before);
-  f.callbacks.get('pagehide')(); const secret = randomUUID(); resolve({ serverUrl: 'https://web.agents-anywhere.com', connectorId: 'fixture', connectorToken: secret }); await flush();
+  f.callbacks.get('pagehide')(); resolve({ connectorToken: randomUUID() }); await flush();
   assert.equal(f.nodes.connectorToken.value, ''); assert.equal(f.nodes.command.value, ''); assert.equal(f.intervals.size, 0);
   assert.equal(f.calls.length, before);
 });
 test('parsing fills local fields without selecting legacy or persisting secrets', async () => {
-  const secret = randomUUID(); const f = fixture(method => method === 'anywhere.parse' ? { serverUrl: 'https://web.agents-anywhere.com', connectorId: 'fixture', connectorToken: secret } : undefined);
-  await flush(); f.nodes.command.value = 'private command'; f.nodes.parse.emit('click'); await flush();
+  const secret = `cxt_${randomUUID()}`; const f = fixture();
+  await flush(); f.nodes.command.value = `uvx anywhere-cli start --server-url https://web.agents-anywhere.com --connector-id conn_fixture --connector-token ${secret}`; f.nodes.parse.emit('click'); await flush();
   assert.equal(f.nodes.connectorToken.value, secret); assert.equal(f.nodes.command.value, ''); assert.equal(f.nodes.profile.value, 'current'); assert.equal(f.nodes.consent.checked, false);
   f.nodes.serverUrl.value = 'https://chosen.example'; f.nodes.serverUrl.emit('input'); f.intervals.get(1)(); await flush(); assert.equal(f.nodes.serverUrl.value, 'https://chosen.example');
   f.callbacks.get('pagehide')(); assert.equal(f.nodes.connectorToken.value, '');
 });
 
 test('host locale changes translate controls, profiles, logs and known errors without changing input', async () => {
-  const f = fixture(method => { if (method === 'anywhere.parse') throw Object.assign(new Error('must not be displayed'), { code: 'INVALID_COMMAND' }); });
+  const f = fixture();
   await flush();
   f.status.logs = [{ event: 'auth_http', detail: '401' }]; f.intervals.get(1)(); await flush();
   f.nodes.connectorToken.value = randomUUID(); const token = f.nodes.connectorToken.value;
@@ -83,7 +86,7 @@ test('host locale changes translate controls, profiles, logs and known errors wi
   assert.match(f.nodes.profile.options[1].textContent, /不支持 Pi/);
   assert.ok(f.nodes.logs.children.some(node => /身份验证 HTTP 状态.*401/.test(node.textContent)));
   assert.equal(f.nodes.state.textContent, '未配置');
-  f.nodes.command.value = 'invalid'; f.nodes.parse.emit('click'); await flush();
+  f.nodes.command.value = '--server-url "unclosed'; f.nodes.parse.emit('click'); await flush();
   assert.match(f.nodes.message.textContent, /无法解析命令/);
   f.callbacks.get('locale')('en');
   assert.equal(f.nodes.connect.textContent, 'Connect');
@@ -154,4 +157,29 @@ test('diagnostic reports preserve known network categories but omit arbitrary ba
   f.intervals.get(1)(); await flush(); f.nodes.diagnostics.emit('click');
   assert.match(f.nodes.report.value, /WS_CONNECT:TLS_FAILURE/); assert.match(f.nodes.report.value, /auth_http: 401/);
   assert.ok(!f.nodes.report.value.includes(secret)); f.callbacks.get('pagehide')();
+});
+
+test('self-hosted commands parse locally with no bridge or with stalled host status', async () => {
+  for (const stalled of [false, true]) {
+    const f = stalled ? fixture(method => method === 'anywhere.status' ? new Promise(() => {}) : undefined) : fixture(undefined, { noBridge: true });
+    await flush();
+    const token = `cxt_${randomUUID()}-_abc`; const id = `conn_${randomUUID()}`;
+    f.nodes.command.value = `uvx anywhere-cli start --server-url https://anywhere.emssion.com --connector-id ${id} --connector-token ${token}`;
+    assert.equal(f.nodes.parse.disabled, false); f.nodes.parse.emit('click'); await flush();
+    assert.equal(f.nodes.serverUrl.value, 'https://anywhere.emssion.com'); assert.equal(f.nodes.connectorId.value, id); assert.equal(f.nodes.connectorToken.value, token);
+    assert.equal(f.nodes.command.value, ''); assert.equal(f.nodes.consent.checked, false);
+    assert.equal(f.calls.some(call => ['anywhere.parse', 'anywhere.connect'].includes(call.method)), false);
+    f.nodes.diagnostics.emit('click'); assert.match(f.nodes.report.value, /command_parsed/);
+    assert.ok(!f.nodes.report.value.includes(token)); assert.ok(!f.nodes.report.value.includes(id));
+    f.callbacks.get('pagehide')(); f.nodes.parse.emit('click'); assert.equal(f.nodes.connectorToken.value, '');
+  }
+});
+test('trailing commentary and missing local parser fail visibly without partial field updates', async () => {
+  const f = fixture(); await flush(); const token = `cxt_${randomUUID()}`;
+  f.nodes.connectorId.value = 'unchanged';
+  f.nodes.command.value = `uvx anywhere-cli start --server-url https://anywhere.emssion.com --connector-id conn_fixture --connector-token ${token}附加说明`;
+  f.nodes.parse.emit('click'); assert.equal(f.nodes.connectorId.value, 'unchanged'); assert.match(f.nodes.message.textContent, /invalid_config/);
+  assert.equal(f.calls.some(call => call.method === 'anywhere.parse'), false); f.callbacks.get('pagehide')();
+  const missing = fixture(undefined, { noParser: true }); await flush(); missing.nodes.parse.emit('click');
+  assert.match(missing.nodes.message.textContent, /parser_unavailable/); missing.callbacks.get('pagehide')();
 });

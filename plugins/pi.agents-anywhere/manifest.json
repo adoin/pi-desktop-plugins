@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "pi.agents-anywhere",
   "name": "Agents Anywhere — Connection Preview",
-  "version": "2.0.0-alpha.3",
+  "version": "2.0.0-alpha.4",
   "description": "Phase 2 connection preview: explicit Connector authentication, runtime discovery and diagnostics. No remote session access yet.",
   "i18n": {
     "en": {
@@ -19,7 +19,7 @@
   "author": "PI-Desktop Plugin Contributors",
   "main": "main.js",
   "categories": ["productivity"],
-  "changelog": "2.0.0-alpha.3: add independent panel diagnostics, bridge timeout/error reporting, configuration rejection logs, staged safe network error categories and a copyable credential-free report. Permissions are unchanged.",
+  "changelog": "2.0.0-alpha.4: parse pasted connection commands locally with a shared pure parser, even when the host bridge is missing or stalled. Connection authorization and exact-domain restrictions remain enforced in the backend.",
   "permissions": ["ui.panel", "ui.view", "net.fetch", "net.websocket", "background.service"],
   "net": { "domains": ["web.agents-anywhere.com"] },
   "engines": { "piDesktop": ">=0.15.9" },
