@@ -13,14 +13,17 @@
 </head>
 <body>
   <main>
-    <header><h1>Agents Anywhere</h1><span class="badge" data-i18n="stage">Connection preview · No chat</span></header>
-    <section class="card" aria-labelledby="status-title">
+    <header>
+      <div class="brand"><span class="brandmark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M12 10l-4 4a6 6 0 008 8l4-4M20 22l4-4a6 6 0 00-8-8l-4 4M12 20l8-8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg></span><h1>Agents Anywhere</h1></div>
+      <span class="badge" data-i18n="stage">Connection preview · No chat</span>
+    </header>
+    <section class="card status-card" aria-labelledby="status-title">
       <div class="row"><h2 id="status-title" data-i18n="status">Connection status</h2><button id="refresh" type="button" data-i18n="refresh">Refresh</button></div>
       <p id="state" role="status"></p>
-      <dl><dt data-i18n="discovered">Runtime discovered</dt><dd id="discovered">—</dd><dt data-i18n="running">Runtime running</dt><dd id="running">—</dd></dl>
+      <dl><div class="metric"><dt data-i18n="discovered">Runtime discovered</dt><dd id="discovered">—</dd></div><div class="metric"><dt data-i18n="running">Runtime running</dt><dd id="running">—</dd></div></dl>
       <p data-i18n="visibility">An online socket does not prove device visibility in Cloud.</p>
     </section>
-    <form id="connection" class="card" autocomplete="off">
+    <form id="connection" class="card settings-card" autocomplete="off">
       <h2 data-i18n="settings">Connection settings</h2>
       <label for="command" data-i18n="command">Paste CLI command (parsed only, never executed)</label>
       <textarea id="command" rows="3" spellcheck="false" autocomplete="off" maxlength="8192"></textarea>
@@ -36,7 +39,7 @@
       <p id="message" role="alert"></p>
     </form>
     <section class="card notes"><h2 data-i18n="boundaries">Preview boundaries</h2><p data-i18n="security">No automatic protocol downgrade. Tokens are not stored. Self-hosted servers require an explicit manifest host allowlist; wildcards are not supported.</p><p data-i18n="verification">Current protocol is tested offline, not Cloud-proven. Legacy v0.1.7 cannot register Pi and is disabled. No session sharing or chat yet.</p></section>
-    <section class="card"><h2 data-i18n="logs">Connection events</h2><p data-i18n="logPrivacy">Only recognized event codes and bounded diagnostic details are shown; credentials are excluded.</p><ul id="logs"></ul></section>
+    <section class="card logs-card"><h2 data-i18n="logs">Connection events</h2><p data-i18n="logPrivacy">Only recognized event codes and bounded diagnostic details are shown; credentials are excluded.</p><ul id="logs"></ul></section>
   </main>
   <script src="./appearance.js"></script>
   <script src="./panel.js"></script>

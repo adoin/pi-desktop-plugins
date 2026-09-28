@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "pi.agents-anywhere",
   "name": "Agents Anywhere — Connection Preview",
-  "version": "2.0.0-alpha.1",
+  "version": "2.0.0-alpha.2",
   "description": "Phase 2 connection preview: explicit Connector authentication, runtime discovery and diagnostics. No remote session access yet.",
   "i18n": {
     "en": {
@@ -19,7 +19,7 @@
   "author": "PI-Desktop Plugin Contributors",
   "main": "main.js",
   "categories": ["productivity"],
-  "changelog": "2.0.0-alpha.1: add the Phase 2 connection preview with current-protocol authentication, bounded RPC, runtime lifecycle and explicit protocol selection. Not a full remote-chat release.",
+  "changelog": "2.0.0-alpha.2: refresh the bilingual panel with teal light/dark palettes, status colors, clearer hierarchy, responsive cards and reduced-motion support. Connection-preview scope and permissions are unchanged.",
   "permissions": ["ui.panel", "ui.view", "net.fetch", "net.websocket", "background.service"],
   "net": { "domains": ["web.agents-anywhere.com"] },
   "engines": { "piDesktop": ">=0.15.9" },

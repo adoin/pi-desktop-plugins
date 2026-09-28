@@ -93,9 +93,11 @@
     document.documentElement.lang = locale;
     document.querySelectorAll('[data-i18n]').forEach((node) => { node.textContent = text(node.dataset.i18n); });
     $('state').textContent = text(states.has(status?.state) ? status.state : 'unknown');
+    $('state').dataset.state = states.has(status?.state) ? status.state : 'unknown';
     for (const key of ['discovered', 'running']) {
       const value = status?.runtime?.[key];
       $(key).textContent = text(typeof value === 'boolean' ? (value ? 'yes' : 'no') : 'unknown');
+      $(key).dataset.active = String(value === true);
     }
     for (const option of $('profile').options) {
       const entry = status?.profiles?.find((item) => item?.id === option.value);

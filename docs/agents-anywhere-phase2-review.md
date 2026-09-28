@@ -144,3 +144,36 @@ host redirect limitation. Record installed host/Server/client versions and
 sanitized diagnostics only. After Phase 2 acceptance, implement session discovery
 with a consented export scope and durable identity mapping before chat/control.
 Do not claim completion of the user's full v2 task or old/new compatibility.
+
+## Visual refresh follow-up: 2.0.0-alpha.2
+
+The user requested a less monochrome panel. This update changes only the
+renderer presentation, version/readme/changelog and related tests/artifacts;
+network logic, capabilities and permissions are unchanged. It adds coordinated
+teal light/dark palettes with indigo and warm accents, a local inline decorative
+SVG, status-colored indicators with text retained, metric cards, input/button
+hierarchy, focus rings, narrow-layout rules and reduced-motion support. No
+external fonts, images or dependencies were introduced.
+
+BrowserPreview succeeded for this follow-up. Dark English and light Chinese
+full-page screenshots were inspected. A 360px body-width check found no
+horizontal overflow, and computed online/error/connecting colors were distinct.
+The browser's CDP allowlist refused viewport emulation, so the body-width check
+is not represented as actual mobile-device testing. The preview has no plugin
+bridge and showed the expected bridge-unavailable message; no credentials or
+Cloud connections were used. Reduced motion and state-to-style bindings have
+automated coverage; the complete live host/Cloud acceptance remains pending.
+
+Verification: 37/37 targeted plugin/panel-contract checks passed. Full suite:
+215 tests, 209 passed, the same 6 baseline failures. Scoped security preflight:
+0 blockers, 10 manual-review signals. Full package preflight: the same 342
+pre-existing blockers and no new Anywhere blocker. PluginPack validation passed
+with the previously documented static-scan/high-risk warnings. The new 12-file
+store-only package was compared byte-for-byte with source and checked for unsafe
+entries; unrelated catalog entries were verified unchanged.
+
+Artifact: `packages/pi.agents-anywhere-2.0.0-alpha.2.piplug`, 71,103 bytes.
+SHA-256: `910392bda8d92f54cb5a4045d6a1140358a5f0d0601d3b9b0762dadc6ba434a0`.
+Generated catalog hash and size match. This local feature-branch checkpoint
+does not waive any of the Cloud, legacy, redirect-security or maintainer-approval
+gates above and has not been pushed or published.

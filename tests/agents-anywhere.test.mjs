@@ -33,7 +33,7 @@ function fixture(overrides = {}) {
 }
 
 test('manifest pins preview version, exact minimal permissions and bilingual install disclosures', () => {
-  assert.equal(manifest.id, 'pi.agents-anywhere'); assert.equal(manifest.version, '2.0.0-alpha.1');
+  assert.equal(manifest.id, 'pi.agents-anywhere'); assert.equal(manifest.version, '2.0.0-alpha.2');
   assert.deepEqual(manifest.permissions, ['ui.panel', 'ui.view', 'net.fetch', 'net.websocket', 'background.service']);
   assert.deepEqual(manifest.net.domains, ['web.agents-anywhere.com']);
   for (const locale of ['en', 'zh-CN']) { for (const key of ['name', 'description', 'safetyNotes']) assert.ok(manifest.i18n[locale][key]); assert.ok(manifest.ui.title[locale]); }

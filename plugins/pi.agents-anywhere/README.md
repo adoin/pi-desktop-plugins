@@ -1,9 +1,13 @@
 # Agents Anywhere — connection preview
 
-Version: **2.0.0-alpha.1**. Development-only Phase 2 checkpoint, not a full remote
+Version: **2.0.0-alpha.2**. Development-only Phase 2 checkpoint, not a full remote
 chat release. Cloud/device visibility has **not** been verified with real
 credentials. Do not interpret the alpha package or passing tests as release
 approval.
+
+The alpha.2 visual refresh adds coordinated teal light/dark palettes, semantic
+status colors, responsive cards, keyboard focus styling and reduced-motion
+support. English/Chinese behavior, protocol scope and permissions are unchanged.
 
 ## Implemented scope
 

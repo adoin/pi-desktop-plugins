@@ -99,3 +99,24 @@ test('every visible translation key has matching English and Chinese entries', (
   const html = readFileSync(new URL('../plugins/pi.agents-anywhere/renderer/index.html', import.meta.url), 'utf8');
   for (const [, key] of html.matchAll(/data-i18n="([^"]+)"/g)) assert.ok(dictionaries.en[key] && dictionaries['zh-CN'][key], key);
 });
+
+test('visual state attributes retain readable labels and reject unknown state styling', async () => {
+  const f = fixture(); await flush();
+  f.status.state = 'online'; f.status.runtime = { discovered: true, running: true };
+  f.intervals.get(1)(); await flush();
+  assert.equal(f.nodes.state.dataset.state, 'online'); assert.match(f.nodes.state.textContent, /Online/);
+  assert.equal(f.nodes.running.dataset.active, 'true'); assert.equal(f.nodes.discovered.dataset.active, 'true');
+  f.status.state = 'network_error'; f.intervals.get(1)(); await flush();
+  assert.equal(f.nodes.state.dataset.state, 'network_error'); assert.match(f.nodes.state.textContent, /Network error/);
+  f.status.state = 'untrusted value'; f.intervals.get(1)(); await flush();
+  assert.equal(f.nodes.state.dataset.state, 'unknown'); f.callbacks.get('pagehide')();
+});
+test('panel styling supports both themes, narrow screens, focus and reduced motion', () => {
+  const css = readFileSync(new URL('../plugins/pi.agents-anywhere/renderer/panel.css', import.meta.url), 'utf8');
+  assert.match(css, /data-theme="light"/); assert.match(css, /data-theme="dark"/);
+  assert.match(css, /prefers-reduced-motion: reduce/); assert.match(css, /animation: none !important/);
+  assert.match(css, /:focus-visible/); assert.match(css, /max-width: 480px/);
+  assert.match(css, /data-state="online"/); assert.match(css, /data-state="network_error"/);
+  assert.match(css, /var\(--pi-plugin-titlebar-height, 46px\)/);
+  assert.doesNotMatch(css, /https?:\/\//);
+});
