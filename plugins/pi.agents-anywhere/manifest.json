@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "pi.agents-anywhere",
+  "name": "Agents Anywhere — Connection Preview",
+  "version": "2.0.0-alpha.1",
+  "description": "Phase 2 connection preview: explicit Connector authentication, runtime discovery and diagnostics. No remote session access yet.",
+  "i18n": {
+    "en": {
+      "name": "Agents Anywhere — Connection Preview",
+      "description": "Connect Pi Desktop to a verified Agents Anywhere protocol. Connection and runtime lifecycle only; chat is not implemented yet.",
+      "safetyNotes": "Explicitly connects to the declared server using credentials kept in memory. Sends runtime identity and heartbeats, not sessions or files. No commands are executed from pasted text. Background connection stops on disconnect or unload. Experimental, not Cloud-certified. Host-managed redirects require security review."
+    },
+    "zh-CN": {
+      "name": "Agents Anywhere — 连接预览",
+      "description": "通过经核实的协议连接 Agents Anywhere。目前仅支持连接与 Runtime 生命周期，尚未实现会话聊天。",
+      "safetyNotes": "仅在确认后连接声明的服务器，凭据只驻留内存。发送 Runtime 标识和心跳，不发送会话或文件。粘贴的命令不会执行。断开或卸载时停止后台连接。实验版本，尚未通过 Cloud 实测；宿主自动重定向仍需安全核验。"
+    }
+  },
+  "author": "PI-Desktop Plugin Contributors",
+  "main": "main.js",
+  "categories": ["productivity"],
+  "changelog": "2.0.0-alpha.1: add the Phase 2 connection preview with current-protocol authentication, bounded RPC, runtime lifecycle and explicit protocol selection. Not a full remote-chat release.",
+  "permissions": ["ui.panel", "ui.view", "net.fetch", "net.websocket", "background.service"],
+  "net": { "domains": ["web.agents-anywhere.com"] },
+  "engines": { "piDesktop": ">=0.15.9" },
+  "activationEvents": ["onStartup", "onCommand:pi-agents-anywhere.open"],
+  "ui": {
+    "panel": "renderer/index.html",
+    "title": { "en": "Agents Anywhere", "zh-CN": "Agents Anywhere 远程连接" },
+    "width": 780,
+    "height": 780
+  },
+  "contributes": {
+    "commands": [{ "id": "pi-agents-anywhere.open", "title": "Agents Anywhere: Connection Settings / 连接设置", "keywords": ["anywhere", "connector", "远程连接"] }],
+    "views": [{ "id": "anywhere-connection", "title": { "en": "Agents Anywhere", "zh-CN": "远程连接" }, "icon": "link", "entry": "renderer/index.html", "order": 20 }],
+    "services": [{ "id": "anywhere-connection", "label": "Agents Anywhere connection / 远程连接" }]
+  }
+}

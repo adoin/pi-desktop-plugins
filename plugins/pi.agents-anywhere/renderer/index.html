@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="pi-plugin-chrome" content="v3" />
+  <!-- PI-Desktop owns exactly a transparent 46px drag band and a three-button
+       window-control capsule. Fixed/sticky controls start at
+       var(--pi-plugin-titlebar-height, 46px); no duplicate draggable titlebar. -->
+  <title>Agents Anywhere</title>
+  <script src="./appearance-boot.js"></script>
+  <link rel="stylesheet" href="./panel.css" />
+</head>
+<body>
+  <main>
+    <header><h1>Agents Anywhere</h1><span class="badge" data-i18n="stage">Connection preview · No chat</span></header>
+    <section class="card" aria-labelledby="status-title">
+      <div class="row"><h2 id="status-title" data-i18n="status">Connection status</h2><button id="refresh" type="button" data-i18n="refresh">Refresh</button></div>
+      <p id="state" role="status"></p>
+      <dl><dt data-i18n="discovered">Runtime discovered</dt><dd id="discovered">—</dd><dt data-i18n="running">Runtime running</dt><dd id="running">—</dd></dl>
+      <p data-i18n="visibility">An online socket does not prove device visibility in Cloud.</p>
+    </section>
+    <form id="connection" class="card" autocomplete="off">
+      <h2 data-i18n="settings">Connection settings</h2>
+      <label for="command" data-i18n="command">Paste CLI command (parsed only, never executed)</label>
+      <textarea id="command" rows="3" spellcheck="false" autocomplete="off" maxlength="8192"></textarea>
+      <button id="parse" type="button" data-i18n="parse">Parse command</button>
+      <div class="fields">
+        <div class="wide"><label for="serverUrl" data-i18n="origin">Server origin</label><input id="serverUrl" type="url" value="https://web.agents-anywhere.com" required spellcheck="false" /></div>
+        <div><label for="connectorId" data-i18n="connectorId">Connector ID</label><input id="connectorId" required spellcheck="false" /></div>
+        <div><label for="connectorToken" data-i18n="token">Connector token</label><input id="connectorToken" type="password" autocomplete="new-password" required /></div>
+        <div class="wide"><label for="profile" data-i18n="profile">Protocol profile</label><select id="profile"><option value="current">Current</option><option value="legacy" disabled>Legacy</option></select></div>
+      </div>
+      <label class="consent"><input id="consent" type="checkbox" /><span data-i18n="consent">Allow connection to selected server. No sessions are shared in this preview.</span></label>
+      <div class="actions"><button id="connect" type="submit" data-i18n="connect" disabled>Connect</button><button id="disconnect" type="button" data-i18n="disconnect">Disconnect</button></div>
+      <p id="message" role="alert"></p>
+    </form>
+    <section class="card notes"><h2 data-i18n="boundaries">Preview boundaries</h2><p data-i18n="security">No automatic protocol downgrade. Tokens are not stored. Self-hosted servers require an explicit manifest host allowlist; wildcards are not supported.</p><p data-i18n="verification">Current protocol is tested offline, not Cloud-proven. Legacy v0.1.7 cannot register Pi and is disabled. No session sharing or chat yet.</p></section>
+    <section class="card"><h2 data-i18n="logs">Connection events</h2><p data-i18n="logPrivacy">Only recognized event codes and bounded diagnostic details are shown; credentials are excluded.</p><ul id="logs"></ul></section>
+  </main>
+  <script src="./appearance.js"></script>
+  <script src="./panel.js"></script>
+</body>
+</html>

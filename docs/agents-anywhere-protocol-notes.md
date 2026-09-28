@@ -2,6 +2,10 @@
 
 ## 1. Scope and evidence baseline
 
+Historical Phase 1 record. The later, user-authorized Phase 2 implementation
+checkpoint is recorded in [the Phase 2 review](agents-anywhere-phase2-review.md).
+Statements about not implementing below describe the original Phase 1 boundary.
+
 Status: **Phase 1 research complete; implementation not started.** This is a design
 record, not a release approval or a claim of successful Cloud connectivity.
 Only this document is delivered. No plugin code, manifest, package, or catalog is
@@ -732,3 +736,41 @@ edit, push, marketplace publication, or change to the user's task brief.
 [AA]: https://github.com/anywhere-labs/Agents-Anywhere/tree/873f4ae93bb3d3fa6c30f189410f394ef57cf15e
 [PI]: https://github.com/vastsa/pi-desktop/tree/b684e661797996db3ac64c3c5bdf5764a38fd522
 [OLD]: https://github.com/mazongYY/pi-desktop-plugins/tree/d6f8a083e9f83ece9637fc16cbe0d6d0af955c1e
+
+## 11. Follow-up: verified historical compatibility boundary
+
+The official `v0.1.7` tag points to
+`2f7cce16d6e14ea6d89279a2a74aee0b73d6ab48`; Connector package metadata there is
+`anywhere-cli 0.1.7.2`. This is the pinned historical research target, not a claim
+of historical PyPI artifact or deployed-server acceptance. GitHub release API
+metadata was unavailable due to rate limiting; the tag/source was verified.
+
+The `/api/v2` namespace was introduced by
+`ecb90628e7e0d4e1876c2e45d32022483205ba79` on 2026-07-20; its parent is
+`9a2547c5dd5b98410b3363df0b26352a9d9c2a50`. The Connector tree and Server
+connector_ingress.py are unchanged between v0.1.7 and that parent. Namespace
+migration is separate from later lifecycle and Runtime Control 2.0 changes.
+
+| Area | Historical v0.1.7 behavior |
+| --- | --- |
+| Auth | POST `/connector/auth`, Connector header, no body; short-lived accessToken/expiresIn |
+| WebSocket | `/connector/ws`, Bearer header and X-Device-OS; never the old Pi plugin's `/connector/v2/rpc` assumption |
+| Framing | Same custom type/id/method/params and ok/result/error envelope family, not JSON-RPC 2.0 |
+| Startup | Connector sends `connector.capabilitiesUpdated`; Server sends `capabilities.setActiveRuntimes {runtimes,revision}` |
+| Lifecycle | `capabilities.scanRuntime`, `invalidateRuntime`, `setActiveRuntimes`, `forceResyncRuntime` |
+| Sessions/control | `session.discover/create/sync`, `turn.start/interrupt`, `approval.resolve` |
+| Notifications | `session.updated`, `timeline.sync`, `timeline.itemUpsert`, `approval.requested` |
+| Identity | Runtime type only; no current named runtime instance contract |
+
+Evidence at v0.1.7: `connector/connector/runtime.py:241–460,547–556,693–700,754–766`,
+`connector/connector/protocol.py:8–26`,
+`server/agent_server/api/connector_ingress.py:121–149,228–281,540–600`, and
+`server/agent_server/core/models.py:8,435–473,517–575`.
+
+**Concrete blocker:** historical `RuntimeName` is
+`Literal["codex", "claude", "opencode", "acp"]`. Stock v0.1.7 session/timeline
+validation does not accept native `pi`. A second transport adapter alone cannot
+provide real compatibility. A reviewed server extension or explicit compatible
+identity mapping is needed; neither has been implemented or accepted. The alpha
+keeps Legacy visible but disabled, with this baseline and reason; it never
+silently impersonates another runtime or claims dual-protocol support.

@@ -1,0 +1,40 @@
+:root, :root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #181818; --surface: #222; --fg: #eee; --muted: #aaa; --border: #444; --accent: #b9d7fb;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f6f7f9; --surface: #fff; --fg: #23262b; --muted: #59616d; --border: #cbd0d8; --accent: #225b98;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, sans-serif; padding: var(--pi-plugin-titlebar-height, 46px) 18px 24px; }
+main { max-width: 780px; margin: 0 auto; }
+header, .row, .actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+header { padding: 20px 0; }
+h1 { font-size: 22px; margin: 0; letter-spacing: -.03em; }
+h2 { font-size: 15px; margin: 0 0 12px; }
+.row h2 { margin: 0; }
+.badge { font-size: 12px; border: 1px solid var(--border); border-radius: 20px; padding: 4px 10px; color: var(--muted); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+p { color: var(--muted); margin: 10px 0 0; }
+#state { color: var(--fg); font-weight: 600; }
+dl { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; }
+dt { color: var(--muted); } dd { margin: 0; }
+label { display: block; margin: 10px 0 6px; }
+input, textarea, select, button { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; }
+input:not([type="checkbox"]), textarea, select { width: 100%; min-width: 0; padding: 9px 10px; }
+textarea { resize: vertical; }
+button { padding: 8px 14px; cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: .5; cursor: default; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; margin: 8px 0 18px; }
+.wide { grid-column: 1 / -1; }
+.consent { display: flex; align-items: flex-start; gap: 10px; margin: 18px 0; }
+.consent input { margin-top: 5px; flex-shrink: 0; }
+.actions { justify-content: flex-start; }
+#connect { border-color: var(--accent); }
+#message:empty { display: none; }
+#logs { padding-left: 20px; max-height: 180px; overflow: auto; color: var(--muted); }
+.notes, #logs { font-size: 13px; }
+@media (max-width: 480px) { body { padding-left: 10px; padding-right: 10px; } .card { padding: 14px; } .fields { grid-template-columns: 1fr; } }
