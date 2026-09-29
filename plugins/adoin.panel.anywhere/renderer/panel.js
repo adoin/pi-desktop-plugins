@@ -3,7 +3,7 @@
   const $ = (id) => document.getElementById(id);
   const words = {
     en: {
-      stage: 'Basic chat beta', status: 'Connection status', refresh: 'Refresh',
+      tabStatus: 'Status', tabConnections: 'Connections', tabEvents: 'Events', connectionSafety: 'Connection safety', status: 'Connection status', refresh: 'Refresh',
       discovered: 'Runtime discovered', running: 'Runtime running',
       visibility: 'An online socket does not prove device visibility in Cloud.',
       settings: 'Connection settings', command: 'Paste CLI command (parsed only, never executed)',
@@ -13,7 +13,7 @@
       shareSessions: 'Share current-workspace paths, titles, user/assistant text, model IDs and status with this server; allow remote create/send/interrupt under existing session permissions. New sessions require local Ask confirmation. Disconnect does not abort accepted turns.',
       runtimeId: 'Runtime instance ID', sharingEnabled: 'Session sharing allowed', sharingReady: 'Sharing ready', workspaceName: 'Approved workspace', sessionCount: 'Shared sessions', lastSyncAt: 'Last status sync',
       runtimeSetup: 'In Anywhere Web/desktop device settings, add the Pi runtime instance, save its empty config, then enable it. Discovery alone does not create an instance.',
-      connect: 'Connect', disconnect: 'Disconnect', boundaries: 'Basic chat beta boundaries',
+      connect: 'Connect', disconnect: 'Disconnect', boundaries: 'Capabilities and limits',
       security: 'No automatic downgrade or reconnect after restart. Optional password-encrypted token storage. Self-hosted domains stay restricted until a future host API supports them.',
       verification: 'Current protocol is tested offline, not Cloud-proven. Legacy v0.1.7 cannot register Pi on its stock server and is disabled. Once locally allowed: session inventory, create/send/interrupt, and final response status sync. Remote tool approval and fine-grained streaming are not supported; local tool permissions may wait for approval locally.',
       logs: 'Connection events', logPrivacy: 'Only recognized event codes and bounded diagnostic details are shown. Credentials and remote error bodies are excluded.',
@@ -36,10 +36,10 @@
       unavailable: 'The plugin or host is unavailable. Reload the plugin and review permissions.'
     },
     'zh-CN': {
-      stage: '基础聊天 Beta', status: '连接状态', refresh: '刷新', discovered: '已发现运行时', running: '运行时正在运行',
+      tabStatus: '状态', tabConnections: '连接管理', tabEvents: '事件', connectionSafety: '连接安全', status: '连接状态', refresh: '刷新', discovered: '已发现运行时', running: '运行时正在运行',
       visibility: '套接字在线不代表设备已在 Cloud 中可见。', settings: '连接设置', command: '粘贴 CLI 命令（仅解析，绝不执行）',
       parse: '解析命令', origin: '服务器源地址', connectorId: '连接器 ID', token: '连接器令牌', profile: '协议配置', current: '当前协议', legacy: '旧版协议',
-      consent: '允许连接到所选服务器。仅在下方另行勾选后才共享会话。', connect: '连接', disconnect: '断开连接', boundaries: '基础聊天 Beta 限制',
+      consent: '允许连接到所选服务器。仅在下方另行勾选后才共享会话。', connect: '连接', disconnect: '断开连接', boundaries: '功能与限制',
       shareSessions: '向此服务器共享当前工作区路径、标题、用户及助手文字、模型标识和状态，并允许按会话现有权限远程创建、发送及中断。新会话需本地确认 Ask 模式。断开不会终止已接收的任务。',
       runtimeId: '运行时实例 ID', sharingEnabled: '已允许会话共享', sharingReady: '共享已就绪', workspaceName: '已授权工作区', sessionCount: '共享会话数', lastSyncAt: '上次状态同步',
       runtimeSetup: '在 Anywhere 网页端或桌面端的设备设置中添加 Pi 运行时实例，保存其空配置，然后启用。仅发现运行时不会创建实例。',
@@ -149,7 +149,45 @@
   let queue = Promise.resolve();
   const text = (key) => words[locale][key] || words[locale].unknown;
   const fail = (code) => Object.assign(new Error(code), { code });
-  const PANEL_VERSION = '2.0.0-beta.3';
+  const PANEL_VERSION = '2.0.0';
+  // Only these fixed navigation IDs may enter browser storage, never form data.
+  const TAB_IDS = ['status', 'connections', 'events'];
+  const TAB_STORAGE_KEY = 'adoin.panel.anywhere.activeTab.v1';
+  function selectTab(id, { persist = false, focus = false } = {}) {
+    const selected = TAB_IDS.includes(id) ? id : 'status';
+    for (const tabId of TAB_IDS) {
+      const active = tabId === selected;
+      const tab = $(`tab-${tabId}`);
+      tab.setAttribute('aria-selected', String(active));
+      tab.tabIndex = active ? 0 : -1;
+      $(`panel-${tabId}`).hidden = !active;
+    }
+    if (persist) {
+      try { window.localStorage.setItem(TAB_STORAGE_KEY, selected); } catch { /* Storage is optional. */ }
+    }
+    if (focus) $(`tab-${selected}`).focus();
+  }
+  let restoredTab = 'status';
+  try {
+    const saved = window.localStorage.getItem(TAB_STORAGE_KEY);
+    if (TAB_IDS.includes(saved)) restoredTab = saved;
+  } catch { /* Disabled storage must not prevent panel initialization. */ }
+  selectTab(restoredTab);
+  TAB_IDS.forEach((id, index) => {
+    const tab = $(`tab-${id}`);
+    tab.addEventListener('click', () => { if (!closed) selectTab(id, { persist: true }); });
+    tab.addEventListener('keydown', event => {
+      if (closed || event.altKey || event.ctrlKey || event.metaKey) return;
+      let next;
+      if (event.key === 'ArrowRight') next = (index + 1) % TAB_IDS.length;
+      else if (event.key === 'ArrowLeft') next = (index + TAB_IDS.length - 1) % TAB_IDS.length;
+      else if (event.key === 'Home') next = 0;
+      else if (event.key === 'End') next = TAB_IDS.length - 1;
+      else return;
+      event.preventDefault();
+      selectTab(TAB_IDS[next], { persist: true, focus: true });
+    });
+  });
   const localLogs = [];
   const events = new Set(['panel_ready', 'bridge_request', 'bridge_failure', 'status_received', 'panel_error', 'form_invalid', 'plugin_loaded', 'connect_received', 'configuration_rejected', 'protocol', 'auth_request', 'auth_http', 'websocket_connect', 'websocket_open', 'rpc', 'retry_scheduled', ...states]);
   events.add('command_parse'); events.add('command_parsed');
@@ -213,6 +251,8 @@
   function controls() {
     document.querySelectorAll('button').forEach((button) => { button.disabled = busy || closed; });
     $('diagnostics').disabled = closed;
+    // Navigation remains usable while polling or connecting, including diagnostics.
+    for (const id of TAB_IDS) $(`tab-${id}`).disabled = closed;
     $('parse').disabled = closed || editingLocked;
     // Keep status polling from disrupting typing; freeze fields only during user actions.
     $('connect').disabled = busy || closed || !$('consent').checked || !status ||

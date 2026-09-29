@@ -1,8 +1,8 @@
 # Agents Anywhere implementation checkpoints and security record
 
-Current checkpoint: **2.0.0-beta.3 basic workspace chat**, described at the end
-of this record. Earlier alpha sections are historical, not current capability
-claims. Real Cloud chat acceptance and production approval remain pending.
+Historical checkpoints through **2.0.0-beta.3** are retained below. The current
+plugin is `adoin.panel.anywhere` 2.0.0; see
+[the current release record](agents-anywhere-release-2.0.0.md).
 
 Date: 2026-09-28. Branch: `feat/pi-agents-anywhere-v2`.
 Plugin: `pi.agents-anywhere`, version `2.0.0-alpha.1`.

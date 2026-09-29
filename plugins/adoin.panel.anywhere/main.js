@@ -16,8 +16,8 @@ function beginOperation() {
   pendingOperation = new Promise(resolve => { finish = resolve; });
   return () => { connectionBusy = false; finish(); };
 }
-const COMMAND = 'pi-agents-anywhere.open';
-const SERVICE = 'anywhere-connection';
+const COMMAND = 'adoin.panel.anywhere.open';
+const SERVICE = 'adoin-panel-anywhere-connection';
 function status() { return { ...client.status(), savedConnection: saved?.public() || null, savedConnectionError: savedError }; }
 
 async function onLoad() {

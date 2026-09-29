@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const { IngestTransport } = require('../plugins/pi.agents-anywhere/src/ingest.js');
+const { IngestTransport } = require('../plugins/adoin.panel.anywhere/src/ingest.js');
 // All credentials and responses are synthetic; no network requests leave this fixture.
 const config = { serverUrl: 'https://synthetic.invalid', connectorId: 'synthetic-id', connectorToken: 'synthetic-connector-token' };
 const auth = { accessToken: 'synthetic-access-token', expiresIn: 900 };

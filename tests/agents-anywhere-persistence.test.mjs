@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
 const require = createRequire(import.meta.url);
-const main = require('../plugins/pi.agents-anywhere/main');
+const main = require('../plugins/adoin.panel.anywhere/main');
 const flush = () => new Promise(resolve => setImmediate(resolve));
 async function fixture(t) {
   const previous = globalThis.pi;

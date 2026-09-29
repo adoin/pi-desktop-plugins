@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
 const require = createRequire(import.meta.url);
-const root = '../plugins/pi.agents-anywhere/';
+const root = '../plugins/adoin.panel.anywhere/';
 const { origin, parseCommand, validateConfig } = require(`${root}src/config.js`);
 const { PROFILES, endpoints } = require(`${root}src/profiles.js`);
 const { Connector } = require(`${root}src/connector.js`);
@@ -32,8 +32,13 @@ function fixture(overrides = {}) {
   };
 }
 
-test('manifest pins beta version, exact minimal permissions and bilingual install disclosures', () => {
-  assert.equal(manifest.id, 'pi.agents-anywhere'); assert.equal(manifest.version, '2.0.0-beta.3');
+test('manifest pins renamed stable version, exact permissions and bilingual install disclosures', () => {
+  assert.equal(manifest.id, 'adoin.panel.anywhere'); assert.equal(manifest.version, '2.0.0');
+  assert.ok(!/beta/i.test(manifest.name));
+  assert.deepEqual(manifest.activationEvents, ['onStartup', 'onCommand:adoin.panel.anywhere.open']);
+  assert.equal(manifest.contributes.commands[0].id, 'adoin.panel.anywhere.open');
+  assert.equal(manifest.contributes.views[0].id, 'adoin-panel-anywhere');
+  assert.equal(manifest.contributes.services[0].id, 'adoin-panel-anywhere-connection');
   assert.deepEqual(manifest.permissions, ['ui.panel', 'ui.view', 'net.fetch', 'net.websocket', 'background.service', 'desktop.control', 'models.list']);
   assert.deepEqual(manifest.net.domains, ['web.agents-anywhere.com']);
   for (const locale of ['en', 'zh-CN']) { for (const key of ['name', 'description', 'safetyNotes']) assert.ok(manifest.i18n[locale][key]); assert.ok(manifest.ui.title[locale]); }
@@ -152,6 +157,8 @@ test('plugin load is offline; consent is required and unload unregisters all res
   const main = require(`${root}main.js`);
   try {
     await main.onLoad(); assert.equal(f.requests.length, 0); assert.equal((await main.onPanelInvoke('anywhere.status')).state, 'unconfigured');
+    assert.ok(commands.has('adoin.panel.anywhere.open'));
+    assert.ok(services.has('adoin-panel-anywhere-connection'));
     await assert.rejects(main.onPanelInvoke('anywhere.connect', { ...config(), consent: false }), { code: 'CONSENT_REQUIRED' });
     const diagnosticState = await main.onPanelInvoke('anywhere.status');
     assert.ok(diagnosticState.logs.some(entry => entry.event === 'connect_received'));

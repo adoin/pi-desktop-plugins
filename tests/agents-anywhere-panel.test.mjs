@@ -3,14 +3,15 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { randomUUID } from 'node:crypto';
-const source = readFileSync(new URL('../plugins/pi.agents-anywhere/renderer/panel.js', import.meta.url), 'utf8');
-const parserSource = readFileSync(new URL('../plugins/pi.agents-anywhere/src/connection-input.js', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../plugins/adoin.panel.anywhere/renderer/panel.js', import.meta.url), 'utf8');
+const parserSource = readFileSync(new URL('../plugins/adoin.panel.anywhere/src/connection-input.js', import.meta.url), 'utf8');
 const flush = async () => { for (let i = 0; i < 5; i++) await new Promise(resolve => setImmediate(resolve)); };
 class Element {
   constructor(value = '') { this.value = value; this.dataset = {}; this.disabled = false; this.checked = false; this.handlers = new Map(); this.children = []; this.textContent = ''; }
   addEventListener(event, fn) { this.handlers.set(event, fn); }
-  emit(event) { return this.handlers.get(event)?.({ preventDefault() {} }); }
-  setAttribute() {}
+  emit(event, detail = {}) { const e = { preventDefault() { this.defaultPrevented = true; }, ...detail }; this.handlers.get(event)?.(e); return e; }
+  setAttribute(name, value) { (this.attributes ??= {})[name] = value; }
+  focus() { this.focused = true; }
   replaceChildren() { this.children = []; }
   appendChild(child) { this.children.push(child); }
 }
@@ -18,12 +19,15 @@ function fixture(override, options = {}) {
   const ids = ['connect', 'disconnect', 'parse', 'refresh', 'diagnostics', 'report', 'consent', 'connection', 'profile', 'message', 'logs', 'state', 'discovered', 'running', 'serverUrl', 'connectorId', 'connectorToken', 'command'];
   ids.push('shareSessions', 'runtimeId', 'sharingEnabled', 'sharingReady', 'workspaceName', 'sessionCount', 'lastSyncAt', 'runtimeSetup');
   ids.push('useSaved', 'rememberConnection', 'vaultPassword', 'savedState', 'forgetConsent', 'forgetConnection');
+  const tabs = ['status', 'connections', 'events'];
+  ids.push(...tabs.flatMap(id => [`tab-${id}`, `panel-${id}`]));
   const nodes = Object.fromEntries(ids.map(id => [id, new Element()]));
   nodes.profile.value = 'current'; nodes.profile.options = [new Element('current'), new Element('legacy')];
   Object.defineProperty(nodes.profile, 'selectedOptions', { get: () => nodes.profile.options.filter(option => option.value === nodes.profile.value) });
   const fields = ['consent', 'shareSessions', 'profile', 'serverUrl', 'connectorId', 'connectorToken', 'command', 'useSaved', 'rememberConnection', 'vaultPassword', 'forgetConsent'].map(id => nodes[id]);
   nodes.connection.querySelectorAll = () => fields;
-  const buttons = ['connect', 'disconnect', 'parse', 'refresh'].map(id => nodes[id]);
+  const buttons = ['connect', 'disconnect', 'parse', 'refresh', 'diagnostics', 'forgetConnection', ...tabs.map(id => `tab-${id}`)].map(id => nodes[id]);
+  for (const [index, id] of tabs.entries()) nodes[`tab-${id}`].dataset.i18n = ['tabStatus', 'tabConnections', 'tabEvents'][index];
   for (const id of ['connect', 'disconnect', 'parse', 'refresh']) nodes[id].dataset.i18n = id;
   nodes.runtimeSetup.dataset.i18n = 'runtimeSetup';
   const callbacks = new Map(), intervals = new Map(), deadlines = new Map(), calls = []; let deadlineId = 0;
@@ -36,11 +40,20 @@ function fixture(override, options = {}) {
     throw new Error('Fixture method unavailable');
   } } };
   window.__appearance = { onLocaleChange: fn => callbacks.set('locale', fn), init: () => {} };
+  const storage = options.storage ?? new Map();
+  const writes = [];
+  Object.defineProperty(window, 'localStorage', { get() {
+    if (options.blockStorage) throw new Error('Storage blocked');
+    return {
+      getItem: key => storage.get(key) ?? null,
+      setItem: (key, value) => { if (options.blockWrites) throw new Error('Quota exceeded'); writes.push([key, value]); storage.set(key, value); }
+    };
+  } });
   if (options.noBridge) delete window.pluginBridge;
   if (!options.noParser) runInNewContext(parserSource, { window, URL });
   if (options.parser) window.AnywhereInput = { parseCommand: options.parser };
   runInNewContext(source, { window, document: { documentElement: { lang: 'en' }, hidden: false, getElementById: id => nodes[id], createElement: () => new Element(), querySelectorAll: selector => selector === '[data-i18n]' ? [...buttons, nodes.runtimeSetup] : buttons }, setTimeout: (fn, ms) => { const id = ++deadlineId; deadlines.set(id, { fn, ms }); return id; }, clearTimeout: id => deadlines.delete(id), setInterval: fn => { intervals.set(1, fn); return 1; }, clearInterval: id => intervals.delete(id) });
-  return { nodes, calls, status, callbacks, intervals, deadlines };
+  return { nodes, calls, status, callbacks, intervals, deadlines, storage, writes };
 }
 test('renderer blocks connect without consent, invalidates consent on edits and disables legacy', async () => {
   const f = fixture(); await flush(); const n = f.nodes;
@@ -103,7 +116,7 @@ test('every visible translation key has matching English and Chinese entries', (
   const start = source.indexOf('  const words = '), end = source.indexOf('\n  const states = ');
   const dictionaries = runInNewContext(`${source.slice(start, end)}\nwords`);
   assert.deepEqual(Object.keys(dictionaries.en).sort(), Object.keys(dictionaries['zh-CN']).sort());
-  const html = readFileSync(new URL('../plugins/pi.agents-anywhere/renderer/index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../plugins/adoin.panel.anywhere/renderer/index.html', import.meta.url), 'utf8');
   for (const [, key] of html.matchAll(/data-i18n="([^"]+)"/g)) assert.ok(dictionaries.en[key] && dictionaries['zh-CN'][key], key);
 });
 
@@ -119,7 +132,7 @@ test('visual state attributes retain readable labels and reject unknown state st
   assert.equal(f.nodes.state.dataset.state, 'unknown'); f.callbacks.get('pagehide')();
 });
 test('panel styling supports both themes, narrow screens, focus and reduced motion', () => {
-  const css = readFileSync(new URL('../plugins/pi.agents-anywhere/renderer/panel.css', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../plugins/adoin.panel.anywhere/renderer/panel.css', import.meta.url), 'utf8');
   assert.match(css, /data-theme="light"/); assert.match(css, /data-theme="dark"/);
   assert.match(css, /prefers-reduced-motion: reduce/); assert.match(css, /animation: none !important/);
   assert.match(css, /:focus-visible/); assert.match(css, /max-width: 480px/);
@@ -211,7 +224,7 @@ test('sharing status and runtime instance are bounded, distinct and excluded fro
   const f = fixture(); await flush(); const n = f.nodes;
   assert.equal(n.sharingReady.textContent, 'Unknown'); assert.equal(n.runtimeSetup.hidden, true);
   const privatePath = 'C:\\private\\workspace';
-  f.status.pluginVersion = '2.0.0-beta.3';
+  f.status.pluginVersion = '2.0.0';
   f.status.state = 'online'; f.status.runtime = { discovered: true, running: false, runtimeId: 'instance-'.repeat(40) };
   f.status.sharing = { enabled: true, ready: false, workspaceName: '<workspace>'.repeat(40), workspacePath: privatePath, sessionCount: 3, lastSyncAt: '2026-01-01T00:00:00.000Z' };
   f.intervals.get(1)(); await flush();
@@ -222,7 +235,7 @@ test('sharing status and runtime instance are bounded, distinct and excluded fro
   assert.match(n.runtimeSetup.textContent, /save its empty config, then enable it/);
   f.callbacks.get('locale')('zh-CN'); assert.match(n.runtimeSetup.textContent, /保存其空配置/);
   f.callbacks.get('locale')('en'); n.diagnostics.emit('click');
-  assert.match(n.report.value, /Panel: 2\.0\.0-beta\.3/); assert.match(n.report.value, /Plugin: 2\.0\.0-beta\.3/);
+  assert.match(n.report.value, /Panel: 2\.0\.0\n/); assert.match(n.report.value, /Plugin: 2\.0\.0\n/);
   for (const privateValue of [privatePath, '<workspace>', 'instance-']) assert.ok(!n.report.value.includes(privateValue));
   f.status.runtime.running = true; f.status.sharing = { enabled: false, ready: true, workspaceName: 'not approved', sessionCount: -1, lastSyncAt: privatePath };
   f.intervals.get(1)(); await flush();
@@ -266,4 +279,69 @@ test('forget requires separate confirmation and clears only connection controls'
   assert.equal(f.calls.find(c => c.method === 'anywhere.forget').args.confirm, true);
   assert.equal(n.vaultPassword.value, ''); assert.equal(n.connectorToken.value, ''); assert.equal(n.forgetConsent.checked, false);
   f.callbacks.get('pagehide')();
+});
+
+const tabKey = 'adoin.panel.anywhere.activeTab.v1';
+function assertTab(f, selected) {
+  for (const id of ['status', 'connections', 'events']) {
+    assert.equal(f.nodes[`panel-${id}`].hidden, id !== selected);
+    assert.equal(f.nodes[`tab-${id}`].attributes['aria-selected'], String(id === selected));
+    assert.equal(f.nodes[`tab-${id}`].tabIndex, id === selected ? 0 : -1);
+  }
+}
+test('tabs default to status, switch exclusively and persist only fixed navigation IDs across reopen', async () => {
+  const f = fixture(); await flush(); assertTab(f, 'status'); assert.deepEqual(f.writes, []);
+  const secret = randomUUID();
+  for (const id of ['connectorToken', 'connectorId', 'command', 'vaultPassword']) f.nodes[id].value = secret;
+  f.nodes.consent.checked = true; f.nodes.shareSessions.checked = true;
+  for (const id of ['connections', 'events', 'status', 'events']) {
+    f.nodes[`tab-${id}`].emit('click'); assertTab(f, id);
+  }
+  assert.equal(f.nodes.connectorToken.value, secret); assert.equal(f.nodes.consent.checked, true); assert.equal(f.nodes.shareSessions.checked, true);
+  assert.deepEqual(f.writes, ['connections', 'events', 'status', 'events'].map(id => [tabKey, id]));
+  f.callbacks.get('pagehide')();
+  const reopened = fixture(undefined, { storage: f.storage }); await flush(); assertTab(reopened, 'events');
+  assert.equal(reopened.nodes.connectorToken.value, ''); assert.equal(reopened.nodes.consent.checked, false);
+  reopened.callbacks.get('pagehide')();
+});
+test('corrupt or blocked tab storage falls back safely; failed writes do not block navigation', async () => {
+  for (const value of ['', 'STATUS', 'unknown', '__proto__', '{"tab":"events"}', 'events '.repeat(500)]) {
+    const f = fixture(undefined, { storage: new Map([[tabKey, value]]) }); await flush(); assertTab(f, 'status');
+    assert.deepEqual(f.writes, []); f.nodes['tab-events'].emit('click'); assertTab(f, 'events'); f.callbacks.get('pagehide')();
+  }
+  for (const options of [{ blockStorage: true }, { blockWrites: true }]) {
+    const f = fixture(undefined, options); await flush(); assertTab(f, 'status');
+    f.nodes['tab-connections'].emit('click'); assertTab(f, 'connections'); assert.deepEqual(f.writes, []);
+    assert.equal(f.nodes.parse.disabled, false); f.callbacks.get('pagehide')();
+  }
+});
+test('horizontal tabs support wrapped arrows, Home and End with roving focus during pending requests', async () => {
+  const f = fixture(method => method === 'anywhere.status' ? new Promise(() => {}) : undefined); await flush();
+  for (const [from, key, to] of [['status', 'ArrowLeft', 'events'], ['events', 'ArrowRight', 'status'], ['status', 'End', 'events'], ['events', 'Home', 'status'], ['status', 'ArrowRight', 'connections']]) {
+    assert.equal(f.nodes[`tab-${from}`].disabled, false);
+    assert.equal(f.nodes[`tab-${from}`].emit('keydown', { key }).defaultPrevented, true);
+    assertTab(f, to); assert.equal(f.nodes[`tab-${to}`].focused, true);
+  }
+  assert.equal(f.nodes['tab-connections'].emit('keydown', { key: 'Tab' }).defaultPrevented, undefined);
+  assert.equal(f.nodes['tab-connections'].emit('keydown', { key: 'Home', ctrlKey: true }).defaultPrevented, undefined);
+  assertTab(f, 'connections');
+  f.nodes['tab-events'].emit('click'); f.nodes.diagnostics.emit('click'); assert.match(f.nodes.report.value, /Panel: 2\.0\.0/);
+  f.callbacks.get('locale')('zh-CN'); assertTab(f, 'events');
+  assert.deepEqual(['status', 'connections', 'events'].map(id => f.nodes[`tab-${id}`].textContent), ['状态', '连接管理', '事件']);
+  f.callbacks.get('pagehide')(); f.nodes['tab-status'].emit('click'); assertTab(f, 'events');
+});
+test('HTML exposes linked tabs and panels, preserves all controls and contains no Beta labels', () => {
+  const html = readFileSync(new URL('../plugins/adoin.panel.anywhere/renderer/index.html', import.meta.url), 'utf8');
+  assert.equal([...html.matchAll(/role="tablist"/g)].length, 1);
+  assert.equal([...html.matchAll(/role="tabpanel"/g)].length, 3);
+  for (const id of ['status', 'connections', 'events']) {
+    assert.match(html, new RegExp(`id="tab-${id}"[^>]*role="tab"[^>]*aria-controls="panel-${id}"`));
+    assert.match(html, new RegExp(`id="panel-${id}"[^>]*role="tabpanel"[^>]*aria-labelledby="tab-${id}"`));
+  }
+  const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]);
+  assert.equal(new Set(ids).size, ids.length);
+  for (const id of Object.keys(fixture().nodes)) assert.ok(ids.includes(id), id);
+  assert.doesNotMatch(html, /beta/i);
+  const dictionaries = runInNewContext(`${source.slice(source.indexOf('  const words = '), source.indexOf('\n  const states = '))}\nwords`);
+  assert.doesNotMatch(JSON.stringify(dictionaries), /beta/i);
 });

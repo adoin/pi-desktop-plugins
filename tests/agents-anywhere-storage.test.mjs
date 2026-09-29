@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const { SessionStore, hash } = require('../plugins/pi.agents-anywhere/src/session-store.js');
+const { SessionStore, hash } = require('../plugins/adoin.panel.anywhere/src/session-store.js');
 const KEY = 'anywhereSessionBindingsV1';
 const context = { profile: 'current', serverUrl: 'https://synthetic.invalid', connectorId: 'synthetic-connector' };
 function fixture() {

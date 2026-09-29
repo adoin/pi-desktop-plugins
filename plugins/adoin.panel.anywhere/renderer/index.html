@@ -15,8 +15,14 @@
   <main>
     <header>
       <div class="brand"><span class="brandmark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M12 10l-4 4a6 6 0 008 8l4-4M20 22l4-4a6 6 0 00-8-8l-4 4M12 20l8-8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg></span><h1>Agents Anywhere</h1></div>
-      <span class="badge" data-i18n="stage">Basic chat beta</span>
+      <span class="badge">2.0.0</span>
     </header>
+    <nav class="tabs" role="tablist" aria-label="Anywhere" aria-orientation="horizontal">
+      <button id="tab-status" type="button" role="tab" aria-selected="true" aria-controls="panel-status" tabindex="0" data-i18n="tabStatus">Status</button>
+      <button id="tab-connections" type="button" role="tab" aria-selected="false" aria-controls="panel-connections" tabindex="-1" data-i18n="tabConnections">Connections</button>
+      <button id="tab-events" type="button" role="tab" aria-selected="false" aria-controls="panel-events" tabindex="-1" data-i18n="tabEvents">Events</button>
+    </nav>
+    <div id="panel-status" role="tabpanel" aria-labelledby="tab-status" tabindex="0">
     <section class="card status-card" aria-labelledby="status-title">
       <div class="row"><h2 id="status-title" data-i18n="status">Connection status</h2><button id="refresh" type="button" data-i18n="refresh">Refresh</button></div>
       <p id="state" role="status"></p>
@@ -32,6 +38,9 @@
       <p id="runtimeSetup" data-i18n="runtimeSetup" hidden>In Anywhere Web/desktop device settings, add the Pi runtime instance, save its empty config, then enable it. Discovery alone does not create an instance.</p>
       <p data-i18n="visibility">An online socket does not prove device visibility in Cloud.</p>
     </section>
+      <aside class="card notes"><h2 data-i18n="boundaries">Capabilities and limits</h2><p data-i18n="verification">Current protocol is tested offline, not Cloud-proven. Legacy is disabled. Remote tool approval and fine-grained streaming are not supported; local permissions still apply.</p></aside>
+    </div>
+    <div id="panel-connections" role="tabpanel" aria-labelledby="tab-connections" tabindex="0" hidden>
     <form id="connection" class="card settings-card" autocomplete="off">
       <h2 data-i18n="settings">Connection settings</h2>
       <label for="command" data-i18n="command">Paste CLI command (parsed only, never executed)</label>
@@ -59,7 +68,9 @@
       <div class="actions"><button id="connect" type="submit" data-i18n="connect" disabled>Connect</button><button id="disconnect" type="button" data-i18n="disconnect">Disconnect</button></div>
       <p id="message" role="alert"></p>
     </form>
-    <section class="card notes"><h2 data-i18n="boundaries">Basic chat beta boundaries</h2><p data-i18n="security">No automatic downgrade or reconnect after restart. Optional password-encrypted token storage. Self-hosted servers remain restricted by the manifest allowlist.</p><p data-i18n="verification">Current protocol is tested offline, not Cloud-proven. Legacy v0.1.7 cannot register Pi and is disabled. Once locally allowed: session inventory, create/send/interrupt, and final response status sync. Remote tool approval and fine-grained streaming are not supported; local tool permissions may wait for approval locally.</p></section>
+      <aside class="card notes"><h2 data-i18n="connectionSafety">Connection safety</h2><p data-i18n="security">No automatic downgrade or reconnect after restart. Optional password-encrypted token storage. Self-hosted servers remain restricted by the manifest allowlist.</p></aside>
+    </div>
+    <div id="panel-events" role="tabpanel" aria-labelledby="tab-events" tabindex="0" hidden>
     <section class="card logs-card">
       <div class="row"><h2 data-i18n="logs">Connection events</h2><button id="diagnostics" type="button" data-i18n="diagnostics">Generate diagnostic report / 生成诊断报告</button></div>
       <p data-i18n="logPrivacy">Only recognized event codes and bounded diagnostic details are shown; credentials are excluded.</p>
@@ -68,6 +79,7 @@
       <textarea id="report" rows="9" readonly hidden spellcheck="false"></textarea>
       <p data-i18n="reportHint">Select and copy with Ctrl+C. No credentials are included. / 全选后按 Ctrl+C 复制，不含凭据。</p>
     </section>
+    </div>
   </main>
   <script src="./appearance.js"></script>
   <script src="../src/connection-input.js"></script>

@@ -6,7 +6,7 @@ import { connect as connectTcp } from 'node:net';
 import { EventEmitter } from 'node:events';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 const require = createRequire(import.meta.url);
-const { Connector } = require('../plugins/pi.agents-anywhere/src/connector.js');
+const { Connector } = require('../plugins/adoin.panel.anywhere/src/connector.js');
 
 // Minimal loopback-only fixture, not a production WebSocket implementation.
 function frame(text, mask = false) {
