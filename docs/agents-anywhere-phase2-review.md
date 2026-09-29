@@ -255,3 +255,36 @@ SHA-256: `ed926fa29eec4b1e10aa19ef3ef8a34b58cf6593953838a7dd1ff7314b1a4371`.
 The disclosed credential should be revoked/rotated by its owner. It was not
 stored in project files or used for authentication. Existing release gates are
 unchanged; this update has not been pushed or published.
+
+## Runtime revision fix: 2.0.0-alpha.5
+
+The user demonstrated Cloud device online and Pi runtime discovery, followed by
+the plugin's combined config validation error. Source evidence establishes a
+concrete defect: `server/agent_server/services/device_runtimes.py:741–746,1008–1019`
+at AA commit `873f4ae93bb3d3fa6c30f189410f394ef57cf15e` sends configRevision derived
+from the runtime updatedAt timestamp in milliseconds, not the schema revision.
+The plugin wrongly required exactly 1. Upstream Connector supervisor.py:572–580,
+675–681 accepts nonnegative safe integer config revisions independently of schema.
+
+Alpha.5 accepts that range, preserves the applied revision in runtime.config,
+retains schema revision 1 and independent capability revisions, and resets config
+revision with the runtime instance. Name, empty-config and single-instance checks
+remain enforced. Invalid requests do not change the active config. Distinct safe
+validation messages replace the ambiguous combined error. Permissions, domains
+and session capability scope are unchanged; no credentials were used.
+
+48/48 targeted plugin/panel tests passed, including timestamp/max-safe-integer
+revisions, validation/start/stop/config/reset, invalid types/ranges/names/configs,
+and loopback HTTP/WS runtime startup with a timestamp-shaped server request.
+Full suite: 226 tests, 220 passed, same 6 baseline failures. Scoped security:
+0 blockers, 11 manual-review signals. Full package audit: same 342 pre-existing
+blockers, none for Anywhere. PluginPack passed with the recorded permission/static
+scan warnings. All 14 stored entries match source bytes; no unsafe paths/symlinks.
+Generated catalog size/hash match and unrelated entries are unchanged.
+
+Artifact: `packages/pi.agents-anywhere-2.0.0-alpha.5.piplug`, 84,403 bytes.
+SHA-256: `807b403165c50684c4b7909a424cb78f835886ae95171a083834340d70355484`.
+Install/reload alpha.5, reconnect, and retry enabling Pi Desktop if the old error
+remains. Cloud startup after the fix still requires user retest; the user's
+online screenshot is not represented as an agent-run Cloud acceptance test.
+Existing publication/maintainer gates remain; no push or publication performed.

@@ -1,9 +1,15 @@
 # Agents Anywhere — connection preview
 
-Version: **2.0.0-alpha.4**. Development-only Phase 2 checkpoint, not a full remote
+Version: **2.0.0-alpha.5**. Development-only Phase 2 checkpoint, not a full remote
 chat release. Cloud/device visibility has **not** been verified with real
 credentials. Do not interpret the alpha package or passing tests as release
 approval.
+
+Alpha.5 fixes Runtime startup with current Server timestamp-based configRevision.
+Schema revision remains 1; applied config revisions are independently validated
+and returned unchanged. Reload/install this package, reconnect, and retry enabling
+Pi Desktop on the phone if its previous startup error remains. No session/chat
+capability is added by this fix.
 
 The alpha.4 parser runs entirely in the panel using the same pure input module
 as the backend. Parsing works without a host bridge, during a stalled status

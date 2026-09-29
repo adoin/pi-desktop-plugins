@@ -33,7 +33,7 @@ function fixture(overrides = {}) {
 }
 
 test('manifest pins preview version, exact minimal permissions and bilingual install disclosures', () => {
-  assert.equal(manifest.id, 'pi.agents-anywhere'); assert.equal(manifest.version, '2.0.0-alpha.4');
+  assert.equal(manifest.id, 'pi.agents-anywhere'); assert.equal(manifest.version, '2.0.0-alpha.5');
   assert.deepEqual(manifest.permissions, ['ui.panel', 'ui.view', 'net.fetch', 'net.websocket', 'background.service']);
   assert.deepEqual(manifest.net.domains, ['web.agents-anywhere.com']);
   for (const locale of ['en', 'zh-CN']) { for (const key of ['name', 'description', 'safetyNotes']) assert.ok(manifest.i18n[locale][key]); assert.ok(manifest.ui.title[locale]); }
@@ -63,7 +63,7 @@ test('runtime descriptor is explicit, config is empty, single instance and all c
   assert.equal(type.configSchema.schema.additionalProperties, false);
   assert.equal(runtime.dispatch('runtime.config', scope).running, false);
   assert.throws(() => runtime.dispatch('runtime.start', { ...scope, name: 'Pi', config: { shell: 'bad' }, configRevision: 1 }));
-  assert.throws(() => runtime.dispatch('runtime.start', { ...scope, name: 'Pi', config: {}, configRevision: 2 }));
+  assert.throws(() => runtime.dispatch('runtime.start', { ...scope, name: 'Pi', config: {}, configRevision: -1 }));
   assert.equal(runtime.dispatch('runtime.start', { ...scope, name: 'Pi', config: {}, configRevision: 1 }).status, 'running');
   assert.equal(runtime.dispatch('runtime.config', scope).config.revision, 1);
   assert.ok(runtime.dispatch('runtime.capabilities', scope).capabilitySet.capabilities.every(item => !item.supported && !item.available && !item.allowed));
@@ -224,4 +224,31 @@ test('parsing self-hosted commands does not grant network access', () => {
   const parsed = parseCommand(`uvx anywhere-cli start --server-url https://anywhere.emssion.com --connector-id ${input.connectorId} --connector-token ${input.connectorToken}`);
   assert.equal(parsed.connectorId, input.connectorId); assert.equal(parsed.connectorToken, input.connectorToken);
   assert.throws(() => validateConfig({ ...parsed, consent: true, profile: 'current' }, manifest.net.domains, PROFILES), { code: 'DOMAIN_NOT_ALLOWED' });
+});
+
+test('server timestamp config revisions are independent of schema and capability revisions', () => {
+  const runtime = new RuntimeAdapter();
+  const scope = { runtime: 'pi', runtimeId: 'rti_timestamp' };
+  for (const revision of [0, 2, Date.parse('2026-09-29T01:00:00Z'), Number.MAX_SAFE_INTEGER]) {
+    const params = { ...scope, name: 'Pi Desktop', config: {}, configRevision: revision };
+    assert.equal(runtime.dispatch('runtime.validateConfig', params).valid, true);
+    assert.equal(runtime.dispatch('runtime.start', params).status, 'running');
+    assert.equal(runtime.dispatch('runtime.config', scope).config.revision, revision);
+    assert.equal(runtime.dispatch('runtime.configSchema', scope).configSchema.revision, 1);
+    assert.equal(runtime.dispatch('runtime.stop', scope).status, 'stopped');
+    assert.equal(runtime.dispatch('runtime.config', scope).config.revision, revision);
+  }
+  runtime.reset(); assert.equal(runtime.dispatch('runtime.config', scope).config, null);
+});
+test('invalid revisions, names and config retain strict checks without changing runtime state', () => {
+  const runtime = new RuntimeAdapter(); const params = { runtime: 'pi', runtimeId: 'rti_validation', name: 'Pi', config: {}, configRevision: 1790643600000 };
+  runtime.dispatch('runtime.start', params);
+  for (const method of ['runtime.validateConfig', 'runtime.start']) {
+    for (const revision of [undefined, null, true, '1', -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+      assert.throws(() => runtime.dispatch(method, { ...params, configRevision: revision }), /configRevision/);
+    }
+    for (const name of ['', ' ', null, 'x'.repeat(129)]) assert.throws(() => runtime.dispatch(method, { ...params, name }), /name/);
+    for (const config of [null, [], { unexpected: true }]) assert.throws(() => runtime.dispatch(method, { ...params, config }), /configuration/);
+    assert.equal(runtime.dispatch('runtime.config', { runtime: 'pi', runtimeId: params.runtimeId }).config.revision, params.configRevision);
+  }
 });

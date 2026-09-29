@@ -64,7 +64,7 @@ test('loopback HTTP/WS transport authenticates and exchanges current runtime lif
           assert.equal(message.type, 'response'); assert.equal(message.ok, true);
           if (message.id === 'discovery') {
             assert.equal(message.result.runtimeTypes[0].runtimeType, 'pi');
-            request('start', 'runtime.start', { runtime: 'pi', runtimeId: 'rti_loopback', name: 'Pi', config: {}, configRevision: 1 });
+            request('start', 'runtime.start', { runtime: 'pi', runtimeId: 'rti_loopback', name: 'Pi', config: {}, configRevision: Date.parse('2026-09-29T01:00:00Z') });
           } else if (message.id === 'start') {
             assert.equal(message.result.status, 'running');
             request('capabilities', 'runtime.capabilities', { runtime: 'pi', runtimeId: 'rti_loopback' });
