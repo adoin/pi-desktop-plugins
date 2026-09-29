@@ -16,13 +16,15 @@ class Element {
 }
 function fixture(override, options = {}) {
   const ids = ['connect', 'disconnect', 'parse', 'refresh', 'diagnostics', 'report', 'consent', 'connection', 'profile', 'message', 'logs', 'state', 'discovered', 'running', 'serverUrl', 'connectorId', 'connectorToken', 'command'];
+  ids.push('shareSessions', 'runtimeId', 'sharingEnabled', 'sharingReady', 'workspaceName', 'sessionCount', 'lastSyncAt', 'runtimeSetup');
   const nodes = Object.fromEntries(ids.map(id => [id, new Element()]));
   nodes.profile.value = 'current'; nodes.profile.options = [new Element('current'), new Element('legacy')];
   Object.defineProperty(nodes.profile, 'selectedOptions', { get: () => nodes.profile.options.filter(option => option.value === nodes.profile.value) });
-  const fields = ['consent', 'profile', 'serverUrl', 'connectorId', 'connectorToken', 'command'].map(id => nodes[id]);
+  const fields = ['consent', 'shareSessions', 'profile', 'serverUrl', 'connectorId', 'connectorToken', 'command'].map(id => nodes[id]);
   nodes.connection.querySelectorAll = () => fields;
   const buttons = ['connect', 'disconnect', 'parse', 'refresh'].map(id => nodes[id]);
   for (const id of ['connect', 'disconnect', 'parse', 'refresh']) nodes[id].dataset.i18n = id;
+  nodes.runtimeSetup.dataset.i18n = 'runtimeSetup';
   const callbacks = new Map(), intervals = new Map(), deadlines = new Map(), calls = []; let deadlineId = 0;
   const status = { state: 'unconfigured', serverUrl: 'https://web.agents-anywhere.com', connectorId: '', profile: 'current', runtime: { discovered: false, running: false }, profiles: [{ id: 'current', enabled: true, label: 'Current', baseline: '' }, { id: 'legacy', enabled: false, label: 'Legacy', baseline: '' }], logs: [] };
   const window = { addEventListener: (event, fn) => callbacks.set(event, fn), pluginBridge: { invoke: async (method, args) => {
@@ -36,7 +38,7 @@ function fixture(override, options = {}) {
   if (options.noBridge) delete window.pluginBridge;
   if (!options.noParser) runInNewContext(parserSource, { window, URL });
   if (options.parser) window.AnywhereInput = { parseCommand: options.parser };
-  runInNewContext(source, { window, document: { documentElement: { lang: 'en' }, hidden: false, getElementById: id => nodes[id], createElement: () => new Element(), querySelectorAll: () => buttons }, setTimeout: (fn, ms) => { const id = ++deadlineId; deadlines.set(id, { fn, ms }); return id; }, clearTimeout: id => deadlines.delete(id), setInterval: fn => { intervals.set(1, fn); return 1; }, clearInterval: id => intervals.delete(id) });
+  runInNewContext(source, { window, document: { documentElement: { lang: 'en' }, hidden: false, getElementById: id => nodes[id], createElement: () => new Element(), querySelectorAll: selector => selector === '[data-i18n]' ? [...buttons, nodes.runtimeSetup] : buttons }, setTimeout: (fn, ms) => { const id = ++deadlineId; deadlines.set(id, { fn, ms }); return id; }, clearTimeout: id => deadlines.delete(id), setInterval: fn => { intervals.set(1, fn); return 1; }, clearInterval: id => intervals.delete(id) });
   return { nodes, calls, status, callbacks, intervals, deadlines };
 }
 test('renderer blocks connect without consent, invalidates consent on edits and disables legacy', async () => {
@@ -182,4 +184,49 @@ test('trailing commentary and missing local parser fail visibly without partial 
   assert.equal(f.calls.some(call => call.method === 'anywhere.parse'), false); f.callbacks.get('pagehide')();
   const missing = fixture(undefined, { noParser: true }); await flush(); missing.nodes.parse.emit('click');
   assert.match(missing.nodes.message.textContent, /parser_unavailable/); missing.callbacks.get('pagehide')();
+});
+
+test('session sharing is separate opt-in, resets on all edits, parsing, connect and closure', async () => {
+  const f = fixture(); await flush(); const n = f.nodes;
+  assert.equal(n.shareSessions.checked, false);
+  n.shareSessions.checked = true; n.connection.emit('submit'); await flush();
+  assert.equal(f.calls.some(call => call.method === 'anywhere.connect'), false);
+  for (const id of ['serverUrl', 'connectorId', 'connectorToken', 'profile', 'command']) {
+    n.consent.checked = true; n.shareSessions.checked = true; n[id].emit('input');
+    assert.equal(n.consent.checked, false, id); assert.equal(n.shareSessions.checked, false, id);
+  }
+  n.consent.checked = true; n.connection.emit('submit'); await flush();
+  assert.equal(f.calls.find(call => call.method === 'anywhere.connect').args.shareSessions, false);
+  n.consent.checked = true; n.shareSessions.checked = true; n.connection.emit('submit'); await flush();
+  assert.equal(f.calls.filter(call => call.method === 'anywhere.connect').at(-1).args.shareSessions, true);
+  assert.equal(n.shareSessions.checked, false);
+  n.shareSessions.checked = true;
+  n.command.value = `uvx anywhere-cli start --server-url https://web.agents-anywhere.com --connector-id conn_fixture --connector-token cxt_${randomUUID()}`;
+  n.parse.emit('click'); assert.equal(n.shareSessions.checked, false);
+  n.shareSessions.checked = true; f.callbacks.get('pagehide')(); assert.equal(n.shareSessions.checked, false);
+});
+
+test('sharing status and runtime instance are bounded, distinct and excluded from diagnostics', async () => {
+  const f = fixture(); await flush(); const n = f.nodes;
+  assert.equal(n.sharingReady.textContent, 'Unknown'); assert.equal(n.runtimeSetup.hidden, true);
+  const privatePath = 'C:\\private\\workspace';
+  f.status.pluginVersion = '2.0.0-beta.1';
+  f.status.state = 'online'; f.status.runtime = { discovered: true, running: false, runtimeId: 'instance-'.repeat(40) };
+  f.status.sharing = { enabled: true, ready: false, workspaceName: '<workspace>'.repeat(40), workspacePath: privatePath, sessionCount: 3, lastSyncAt: '2026-01-01T00:00:00.000Z' };
+  f.intervals.get(1)(); await flush();
+  assert.equal(n.sharingEnabled.textContent, 'Yes'); assert.equal(n.sharingReady.textContent, 'No');
+  assert.equal(n.sessionCount.textContent, '3'); assert.equal(n.lastSyncAt.textContent, '2026-01-01T00:00:00.000Z');
+  assert.equal(n.workspaceName.textContent.length, 160); assert.equal(n.runtimeId.textContent.length, 160);
+  assert.equal(n.workspaceName.children.length, 0); assert.equal(n.runtimeSetup.hidden, false);
+  assert.match(n.runtimeSetup.textContent, /save its empty config, then enable it/);
+  f.callbacks.get('locale')('zh-CN'); assert.match(n.runtimeSetup.textContent, /保存其空配置/);
+  f.callbacks.get('locale')('en'); n.diagnostics.emit('click');
+  assert.match(n.report.value, /Panel: 2\.0\.0-beta\.1/); assert.match(n.report.value, /Plugin: 2\.0\.0-beta\.1/);
+  for (const privateValue of [privatePath, '<workspace>', 'instance-']) assert.ok(!n.report.value.includes(privateValue));
+  f.status.runtime.running = true; f.status.sharing = { enabled: false, ready: true, workspaceName: 'not approved', sessionCount: -1, lastSyncAt: privatePath };
+  f.intervals.get(1)(); await flush();
+  assert.equal(n.runtimeSetup.hidden, true); assert.equal(n.sharingReady.textContent, 'Yes');
+  assert.equal(n.workspaceName.textContent, '—'); assert.equal(n.sessionCount.textContent, 'Unknown'); assert.equal(n.lastSyncAt.textContent, '—');
+  assert.ok(f.calls.every(call => call.method === 'anywhere.status'));
+  f.callbacks.get('pagehide')();
 });

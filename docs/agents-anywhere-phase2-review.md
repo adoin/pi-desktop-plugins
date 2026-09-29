@@ -1,4 +1,8 @@
-# Agents Anywhere Phase 2 checkpoint and security record
+# Agents Anywhere implementation checkpoints and security record
+
+Current checkpoint: **2.0.0-beta.1 basic workspace chat**, described at the end
+of this record. Earlier alpha sections are historical, not current capability
+claims. Real Cloud chat acceptance and production approval remain pending.
 
 Date: 2026-09-28. Branch: `feat/pi-agents-anywhere-v2`.
 Plugin: `pi.agents-anywhere`, version `2.0.0-alpha.1`.
@@ -288,3 +292,107 @@ Install/reload alpha.5, reconnect, and retry enabling Pi Desktop if the old erro
 remains. Cloud startup after the fix still requires user retest; the user's
 online screenshot is not represented as an agent-run Cloud acceptance test.
 Existing publication/maintainer gates remain; no push or publication performed.
+
+## Basic workspace chat: 2.0.0-beta.1
+
+This checkpoint replaces the connection-only preview with an opt-in basic chat
+chain. The feature branch remains `feat/pi-agents-anywhere-v2`; main and remote
+branches are not modified. Existing user-owned alpha package deletions and the
+untracked task brief are not included in the implementation commit.
+
+### Capability and data-flow review
+
+Risk remains **High**, now including `desktop.control` and `models.list`.
+Two independent human maintainer approvals: **pending**. An agent review or a
+green automatic preflight is not a human approval or production sign-off.
+
+| Entry / capability | Data and destination | Local gate, bounds and cleanup |
+| --- | --- | --- |
+| Panel `anywhere.connect` | Connector credentials to the exact manifest auth host | Connection consent; separate unchecked workspace-sharing opt-in; no auto-connect |
+| `PiBridge` desktop operations | Native Pi session list/detail/status; create/configure/prompt/abort | `desktop.control`; captured workspace checked before and after each operation; no arbitrary remote cwd/permission override |
+| New session | Title/model/workspace to Pi, then native Ask configuration | `confirm:true` retains native host confirmation; denial leaves at most a blank session, never prompts or deletes it |
+| Existing-session prompt | Remote text to the chosen native Pi session | Exact workspace/session binding; uses locally configured permissions, including automatic tools if the user enabled them |
+| Model catalog | Configured model IDs/labels to Anywhere | `models.list`; whitelist fields, max 200; no provider credentials |
+| HTTP ingest | Workspace path, title, user/assistant text, model selection and status to the selected server | Sharing consent; Bearer auth; bounded payload; accepted/rejected receipt validation; one auth refresh retry |
+| Background poll | Paged eligible inventory; ten sessions synchronized per pass | Three-second reschedule after completion; max ten history pages, 100 messages/page, 16k text/item; no tool output/attachments |
+| Plugin settings | Scope hash, native/platform IDs, content digests, message/turn IDs and operation receipts | No tokens or transcript text; shared write queue, scope isolation, fail-closed limits; no automatic receipt eviction |
+| Stop/disconnect/unload | Local cleanup only | Close transport, cancel timers/listeners, invalidate async generations; accepted Pi turns are not implicitly aborted |
+
+Source-backed host contract is pinned to
+`b684e661797996db3ac64c3c5bdf5764a38fd522` (0.15.9). In particular,
+`agent/getStatus` returns `{status}`, session detail exposes `messageStart` and
+`hasMoreBefore`, and model listing independently requires `models.list`.
+The plugin does not use agent-context-scoped collaboration APIs, subprocesses,
+filesystem traversal or raw networking. New modules use Node built-ins only
+(`crypto`, `path`, `async_hooks`); no dependency or native binary is vendored.
+
+Runtime instances are provisioned/saved by the authenticated user in Anywhere
+Web/desktop device settings. Connector discovery only advertises a type. The
+server reconciles saved active instances through `runtime.start` after reconnect;
+the connector does not call user-only management endpoints or fake an instance.
+Applied server timestamp config revisions remain distinct from schema revision.
+
+Durable operation receipts are reserved before mutations. Accepted results may
+be replayed as responses, never as repeated prompts. A proven pre-mutation
+failure releases its reservation; uncertain delivery stays pending and refuses
+automatic retry. Metadata/timeline/state delivery is retryable and uses stable
+IDs; bounded `complete:false` updates do not erase older history. Disconnect
+fences late host results but cannot undo a host operation already delivered.
+
+### Verification checkpoint
+
+- Complete fake-host Connector integration covers discovery, model catalog,
+  native creation/Ask confirmation, send, text reply/status ingest, interrupt,
+  transport reconnect, saved-instance restart and dedup across service reload.
+- Negative coverage includes workspace changes, readonly/native exclusions,
+  denied confirmation, malformed host results, pending create cancellation,
+  unsupported options, identity conflicts, busy retry, ambiguous delivery,
+  bounded history, storage corruption/concurrency and auth-refresh/close races.
+- `node --test tests/agents-anywhere*.test.mjs tests/panel-chrome.test.mjs`:
+  **139 passed** in the final run. `node --test tests/*.test.mjs`: **317 total,
+  311 passed**, the same six pre-existing gitlens/terminal Windows failures.
+- All plugin JavaScript passed `node --check`. `PluginCheck` passed for 18 files;
+  its network-usage warnings stem from scanning only the main entry module.
+- Scoped security preflight: zero blockers, 13 manual-review signals.
+- BrowserPreview loaded the Chinese beta panel with sharing/status fields and
+  no credentials. A 360px layout check found no horizontal overflow and sharing
+  remained unchecked. File preview has no real plugin bridge; it is not a host
+  permission, session or Cloud acceptance test.
+
+Known production gates remain unchanged: the host redirect API does not prove
+same-origin/TLS credential confinement, real Cloud chat acceptance is pending,
+the shipped allowlist does not authorize a self-hosted domain, and stock legacy
+v0.1.7 cannot register native Pi. Remote approvals, steering, attachments and
+fine-grained streaming stay disabled. The basic-chat beta does not claim all
+phases of the original broader v2 task are complete.
+
+### Review fixes and final artifact
+
+One bounded independent agent review found two concrete defects: a history
+request could reuse a shallow polling task, and a 100-session authorization
+window could reject old bound conversations. History requests now queue behind
+shallow syncs; authorization checks the full eligible inventory while discovery
+and polling page independently. Both defects have dedicated regression tests.
+The parent also removed the unused Connector credential reference from session
+service context; only non-secret namespace fields remain. No second broad
+review or human approval is claimed.
+
+One intermediate concurrent test run reported a loopback-test process failure
+without an actionable diagnostic. Its isolated rerun, subsequent complete
+specialized runs and final full-suite run passed that test. It is recorded,
+not represented as a diagnosed production fault.
+
+`PluginPack` generated **18 store-only entries**, **133,869 bytes**:
+`packages/pi.agents-anywhere-2.0.0-beta.1.piplug`.
+SHA-256: `0b3df9e6ad5a53dce0b6604b4f64ea9854f77b6ccfd7c20c9e48fdaf4b6dfd63`.
+Every packed entry was compared byte-for-byte to source; file set, manifest,
+non-symlink paths and store-only compression were checked. The package contains
+only README, manifest, main, five renderer assets and ten source modules.
+`rebuild_catalog.py` succeeded with 26 entries and the matching package hash.
+
+Final repository security preflight reports **342 blockers**, all pre-existing
+other-package/source mismatches; **none belongs to this plugin**. A temporary
+pack-tool `dist` output briefly caused one additional source-file-set mismatch;
+it was removed after copying the verified artifact and the preflight was rerun.
+The global release gate remains red and is not waived. No remote push or
+marketplace publication was performed.

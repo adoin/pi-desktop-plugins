@@ -15,12 +15,21 @@
   <main>
     <header>
       <div class="brand"><span class="brandmark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M12 10l-4 4a6 6 0 008 8l4-4M20 22l4-4a6 6 0 00-8-8l-4 4M12 20l8-8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg></span><h1>Agents Anywhere</h1></div>
-      <span class="badge" data-i18n="stage">Connection preview · No chat</span>
+      <span class="badge" data-i18n="stage">Basic chat beta</span>
     </header>
     <section class="card status-card" aria-labelledby="status-title">
       <div class="row"><h2 id="status-title" data-i18n="status">Connection status</h2><button id="refresh" type="button" data-i18n="refresh">Refresh</button></div>
       <p id="state" role="status"></p>
       <dl><div class="metric"><dt data-i18n="discovered">Runtime discovered</dt><dd id="discovered">—</dd></div><div class="metric"><dt data-i18n="running">Runtime running</dt><dd id="running">—</dd></div></dl>
+      <dl class="sharing-status">
+        <div class="metric wide"><dt data-i18n="runtimeId">Runtime instance ID</dt><dd id="runtimeId">—</dd></div>
+        <div class="metric"><dt data-i18n="sharingEnabled">Session sharing allowed</dt><dd id="sharingEnabled">—</dd></div>
+        <div class="metric"><dt data-i18n="sharingReady">Sharing ready</dt><dd id="sharingReady">—</dd></div>
+        <div class="metric wide"><dt data-i18n="workspaceName">Approved workspace</dt><dd id="workspaceName">—</dd></div>
+        <div class="metric"><dt data-i18n="sessionCount">Shared sessions</dt><dd id="sessionCount">—</dd></div>
+        <div class="metric"><dt data-i18n="lastSyncAt">Last status sync</dt><dd id="lastSyncAt">—</dd></div>
+      </dl>
+      <p id="runtimeSetup" data-i18n="runtimeSetup" hidden>In Anywhere Web/desktop device settings, add the Pi runtime instance, save its empty config, then enable it. Discovery alone does not create an instance.</p>
       <p data-i18n="visibility">An online socket does not prove device visibility in Cloud.</p>
     </section>
     <form id="connection" class="card settings-card" autocomplete="off">
@@ -34,11 +43,12 @@
         <div><label for="connectorToken" data-i18n="token">Connector token</label><input id="connectorToken" type="password" autocomplete="new-password" required /></div>
         <div class="wide"><label for="profile" data-i18n="profile">Protocol profile</label><select id="profile"><option value="current">Current</option><option value="legacy" disabled>Legacy</option></select></div>
       </div>
-      <label class="consent"><input id="consent" type="checkbox" /><span data-i18n="consent">Allow connection to selected server. No sessions are shared in this preview.</span></label>
+      <label class="consent"><input id="consent" type="checkbox" /><span data-i18n="consent">Allow connection to the selected server. Sessions are shared only if separately checked below.</span></label>
+      <label class="consent"><input id="shareSessions" type="checkbox" /><span data-i18n="shareSessions">Share sessions in the currently open workspace and allow remote create/send/interrupt. Conversation text will be sent to this server; Pi local tool permissions still apply.</span></label>
       <div class="actions"><button id="connect" type="submit" data-i18n="connect" disabled>Connect</button><button id="disconnect" type="button" data-i18n="disconnect">Disconnect</button></div>
       <p id="message" role="alert"></p>
     </form>
-    <section class="card notes"><h2 data-i18n="boundaries">Preview boundaries</h2><p data-i18n="security">No automatic protocol downgrade. Tokens are not stored. Self-hosted servers require an explicit manifest host allowlist; wildcards are not supported.</p><p data-i18n="verification">Current protocol is tested offline, not Cloud-proven. Legacy v0.1.7 cannot register Pi and is disabled. No session sharing or chat yet.</p></section>
+    <section class="card notes"><h2 data-i18n="boundaries">Basic chat beta boundaries</h2><p data-i18n="security">No automatic protocol downgrade. Tokens are not stored. Self-hosted servers require an explicit manifest host allowlist; wildcards are not supported.</p><p data-i18n="verification">Current protocol is tested offline, not Cloud-proven. Legacy v0.1.7 cannot register Pi and is disabled. Once locally allowed: session inventory, create/send/interrupt, and final response status sync. Remote tool approval and fine-grained streaming are not supported; local tool permissions may wait for approval locally.</p></section>
     <section class="card logs-card">
       <div class="row"><h2 data-i18n="logs">Connection events</h2><button id="diagnostics" type="button" data-i18n="diagnostics">Generate diagnostic report / 生成诊断报告</button></div>
       <p data-i18n="logPrivacy">Only recognized event codes and bounded diagnostic details are shown; credentials are excluded.</p>

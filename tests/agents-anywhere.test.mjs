@@ -32,9 +32,9 @@ function fixture(overrides = {}) {
   };
 }
 
-test('manifest pins preview version, exact minimal permissions and bilingual install disclosures', () => {
-  assert.equal(manifest.id, 'pi.agents-anywhere'); assert.equal(manifest.version, '2.0.0-alpha.5');
-  assert.deepEqual(manifest.permissions, ['ui.panel', 'ui.view', 'net.fetch', 'net.websocket', 'background.service']);
+test('manifest pins beta version, exact minimal permissions and bilingual install disclosures', () => {
+  assert.equal(manifest.id, 'pi.agents-anywhere'); assert.equal(manifest.version, '2.0.0-beta.1');
+  assert.deepEqual(manifest.permissions, ['ui.panel', 'ui.view', 'net.fetch', 'net.websocket', 'background.service', 'desktop.control', 'models.list']);
   assert.deepEqual(manifest.net.domains, ['web.agents-anywhere.com']);
   for (const locale of ['en', 'zh-CN']) { for (const key of ['name', 'description', 'safetyNotes']) assert.ok(manifest.i18n[locale][key]); assert.ok(manifest.ui.title[locale]); }
 });
@@ -56,7 +56,7 @@ test('consent, exact domain and enabled profile are mandatory', () => {
   if (!PROFILES.legacy.enabled) assert.throws(() => validateConfig({ ...config(), profile: 'legacy' }, manifest.net.domains, PROFILES));
   assert.throws(() => validateConfig(config(), ['*.agents-anywhere.com'], PROFILES));
 });
-test('runtime descriptor is explicit, config is empty, single instance and all chat capabilities false', () => {
+test('runtime descriptor is explicit, config is empty and chat capabilities remain false without consent', () => {
   const runtime = new RuntimeAdapter(); const scope = { runtime: 'pi', runtimeId: 'rti_fixture' };
   const type = runtime.dispatch('runtime.discover', {}).runtimeTypes[0];
   assert.equal(type.runtimeType, 'pi'); assert.equal(type.instancePolicy, 'single'); assert.equal(type.maxInstances, 1);
@@ -68,7 +68,7 @@ test('runtime descriptor is explicit, config is empty, single instance and all c
   assert.equal(runtime.dispatch('runtime.config', scope).config.revision, 1);
   assert.ok(runtime.dispatch('runtime.capabilities', scope).capabilitySet.capabilities.every(item => !item.supported && !item.available && !item.allowed));
   assert.throws(() => runtime.dispatch('runtime.start', { ...scope, runtimeId: 'rti_other', name: 'Pi', config: {}, configRevision: 1 }));
-  assert.throws(() => runtime.dispatch('session.send_message', { ...scope, content: 'No side effects' }), { code: 'method_not_found' });
+  assert.throws(() => runtime.dispatch('session.send_message', { ...scope, content: 'No side effects' }), { code: 'sharing_disabled' });
   assert.equal(runtime.dispatch('runtime.stop', scope).status, 'stopped');
   assert.throws(() => runtime.dispatch('runtime.capabilities', scope));
 });

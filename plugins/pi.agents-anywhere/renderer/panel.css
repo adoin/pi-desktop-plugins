@@ -85,6 +85,9 @@ dl { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0 14
 dt { color: var(--muted); font-size: 11px; }
 dd { margin: 3px 0 0; font-size: 17px; font-weight: 600; color: var(--muted); }
 dd[data-active="true"] { color: var(--success); }
+.sharing-status .metric { min-width: 0; }
+.sharing-status dd { font-size: 13px; overflow-wrap: anywhere; }
+#runtimeSetup { border-left: 2px solid var(--accent); padding-left: 10px; }
 .status-card > p:last-child { font-size: 11px; max-width: 95%; }
 .settings-card > h2 { display: flex; align-items: center; gap: 9px; }
 .settings-card > h2::before { content: ""; width: 4px; height: 15px; border-radius: 3px; background: var(--accent); }

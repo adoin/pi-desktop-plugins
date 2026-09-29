@@ -4,6 +4,8 @@ const { PROFILES, endpoints } = require('./profiles');
 const { RuntimeAdapter, METHODS } = require('./runtime');
 const { transportCode } = require('./diagnostics');
 const { version } = require('../manifest.json');
+const { SESSION_METHODS } = require('./sessions');
+const { IngestTransport } = require('./ingest');
 
 class Connector {
   constructor(pi, options = {}) {
@@ -27,6 +29,7 @@ class Connector {
     return { pluginVersion: version, state: this.state, ...this.publicConfig, runtime: this.runtime.status(),
       profiles: Object.values(PROFILES).map(({ id, label, enabled, baseline }) => ({ id, label, enabled, baseline })),
       compatibility: { current: PROFILES.current.baseline, legacy: PROFILES.legacy.baseline },
+      sharing: this.sessions?.status() || { enabled: false, ready: false, sessionCount: 0 },
       logs: this.logs.map(item => ({ ...item })),
     };
   }
@@ -39,6 +42,7 @@ class Connector {
     if (socketId) Promise.resolve().then(() => this.pi.net.websocket.close({ socketId, code: 1000 })).catch(() => {});
   }
   clearTransport() {
+    this.ingest?.close(); this.ingest = null;
     for (const id of this.timers) this.clearTimer(id);
     this.timers.clear();
     for (const [event, listener] of this.listeners) { try { this.pi.events.off(event, listener); } catch {} }
@@ -47,14 +51,20 @@ class Connector {
   }
   disconnect() {
     this.want = false; this.config = null; this.generation++; this.clearTransport();
+    this.sessions?.stop(); this.sessions = null; this.runtime.sessions = null;
     this.state = 'disconnected'; this.log('disconnected');
   }
-  connect(config) {
+  connect(config, sessions = null) {
     this.disconnect();
+    this.sessions = sessions; this.runtime.sessions = sessions;
     this.config = { ...config }; this.want = true; this.attempts = 0;
     this.publicConfig = { profile: config.profile, serverUrl: config.serverUrl, connectorId: config.connectorId };
     this.state = 'connecting';
     this.opening = this.open();
+  }
+  async notify(method, params) {
+    if (!this.ingest || !this.want || !this.sessions?.enabled) throw new SafeError('sharing_inactive', 'Connection is not ready for session synchronization.');
+    await this.ingest.send(method, params);
   }
   alive(generation) { return this.want && this.generation === generation; }
   fail(generation, state, retry, detail = '') {
@@ -100,20 +110,24 @@ class Connector {
         const cached = replies.get(frame.id);
         if (cached) {
           if (cached.signature !== signature) { this.fail(generation, 'protocol_incompatible', false, 'RPC_ID_REUSED'); return; }
-          response = cached.response;
+          response = await cached.promise;
         } else {
-          try {
-            if (!record(frame.params)) throw new SafeError('invalid_params', 'RPC params must be an object.');
-            response = { id: frame.id, type: 'response', ok: true, result: this.runtime.dispatch(frame.method, frame.params) };
-          } catch (error) {
-            response = { id: frame.id, type: 'response', ok: false, error: error instanceof SafeError ? { code: error.code, message: error.message } : { code: 'internal_error', message: 'Runtime operation failed.' } };
-          }
-          replies.set(frame.id, { signature, response });
+          const promise = Promise.resolve().then(async () => {
+            try {
+              if (!this.alive(generation)) throw new SafeError('sharing_inactive', 'Connection was closed.');
+              if (!record(frame.params)) throw new SafeError('invalid_params', 'RPC params must be an object.');
+              return { id: frame.id, type: 'response', ok: true, result: await this.runtime.dispatch(frame.method, frame.params, frame.id) };
+            } catch (error) {
+              return { id: frame.id, type: 'response', ok: false, error: error instanceof SafeError ? { code: error.code, message: error.message } : { code: 'internal_error', message: 'Runtime operation failed.' } };
+            }
+          });
+          replies.set(frame.id, { signature, promise });
           if (replies.size > 64) replies.delete(replies.keys().next().value);
+          response = await promise;
         }
         await send(response);
         if (!this.alive(generation)) return;
-        this.log('rpc', `${METHODS.has(frame.method) ? frame.method : 'unsupported_method'}:${response.ok ? 'ok' : response.error.code}`);
+        this.log('rpc', `${METHODS.has(frame.method) || SESSION_METHODS.has(frame.method) ? frame.method : 'unsupported_method'}:${response.ok ? 'ok' : response.error.code}`);
         if (frame.method === 'runtime.discover' && response.ok) {
           this.cancelTimer(discoveryTimer); this.state = 'online'; this.attempts = 0;
         }
@@ -164,6 +178,7 @@ class Connector {
       }
       stage = 'WS_CONNECT';
       this.log('websocket_connect', urls.ws);
+      if (this.sessions) this.ingest = new IngestTransport(this.pi, config, auth, (event, detail) => this.log(event, detail));
       const connection = await this.pi.net.websocket.connect({ url: urls.ws, headers: { Authorization: `Bearer ${auth.accessToken}`, 'X-Device-OS': this.platform === 'win32' ? 'windows' : this.platform === 'darwin' ? 'macos' : 'linux' }, timeoutMs: 10000 });
       auth = null;
       if (!this.alive(generation)) { this.close(connection?.socketId); return; }
@@ -175,6 +190,21 @@ class Connector {
       const early = pending.get(this.socketId); pending.clear();
       if (early?.overflow) { this.fail(generation, 'protocol_incompatible', false, 'EARLY_EVENT_LIMIT'); return; }
       for (const [kind, event] of early?.items || []) handle(kind, event);
+      if (this.sessions) {
+        const sessions = this.sessions;
+        const ended = event => sessions.endTurn(event);
+        this.pi.events.on('session:turnEnded', ended); this.listeners.push(['session:turnEnded', ended]);
+        const sync = async () => {
+          if (!this.alive(generation) || this.sessions !== sessions) return;
+          try { if (this.runtime.running && sessions.ready) await sessions.tick(); }
+          catch (error) {
+            this.log('session_sync_failed', error instanceof SafeError ? error.code : 'HOST_OPERATION_FAILED');
+            if (['workspace_changed', 'workspace_denied', 'host_api_unavailable'].includes(error?.code)) { sessions.stop(); this.log('sharing_stopped', 'WORKSPACE_OR_HOST_CHANGED'); }
+          }
+          if (this.alive(generation) && this.sessions === sessions) this.timer(() => { void sync(); }, 3000);
+        };
+        this.timer(() => { void sync(); }, 1000);
+      }
       const heartbeat = async () => {
         if (!this.alive(generation)) return;
         try {

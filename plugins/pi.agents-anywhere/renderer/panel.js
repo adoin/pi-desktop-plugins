@@ -3,16 +3,19 @@
   const $ = (id) => document.getElementById(id);
   const words = {
     en: {
-      stage: 'Connection preview · No chat', status: 'Connection status', refresh: 'Refresh',
+      stage: 'Basic chat beta', status: 'Connection status', refresh: 'Refresh',
       discovered: 'Runtime discovered', running: 'Runtime running',
       visibility: 'An online socket does not prove device visibility in Cloud.',
       settings: 'Connection settings', command: 'Paste CLI command (parsed only, never executed)',
       parse: 'Parse command', origin: 'Server origin', connectorId: 'Connector ID', token: 'Connector token',
       profile: 'Protocol profile', current: 'Current', legacy: 'Legacy',
-      consent: 'Allow connection to selected server. No sessions are shared in this preview.',
-      connect: 'Connect', disconnect: 'Disconnect', boundaries: 'Preview boundaries',
+      consent: 'Allow connection to the selected server. Sessions are shared only if separately checked below.',
+      shareSessions: 'Share current-workspace paths, titles, user/assistant text, model IDs and status with this server; allow remote create/send/interrupt under existing session permissions. New sessions require local Ask confirmation. Disconnect does not abort accepted turns.',
+      runtimeId: 'Runtime instance ID', sharingEnabled: 'Session sharing allowed', sharingReady: 'Sharing ready', workspaceName: 'Approved workspace', sessionCount: 'Shared sessions', lastSyncAt: 'Last status sync',
+      runtimeSetup: 'In Anywhere Web/desktop device settings, add the Pi runtime instance, save its empty config, then enable it. Discovery alone does not create an instance.',
+      connect: 'Connect', disconnect: 'Disconnect', boundaries: 'Basic chat beta boundaries',
       security: 'No automatic protocol downgrade. Tokens are not stored. Self-hosted servers require an explicit manifest host allowlist; wildcards are not supported.',
-      verification: 'Current protocol is tested offline, not Cloud-proven. Legacy v0.1.7 cannot register Pi on its stock server and is disabled. No session sharing or chat yet.',
+      verification: 'Current protocol is tested offline, not Cloud-proven. Legacy v0.1.7 cannot register Pi on its stock server and is disabled. Once locally allowed: session inventory, create/send/interrupt, and final response status sync. Remote tool approval and fine-grained streaming are not supported; local tool permissions may wait for approval locally.',
       logs: 'Connection events', logPrivacy: 'Only recognized event codes and bounded diagnostic details are shown. Credentials and remote error bodies are excluded.',
       yes: 'Yes', no: 'No', unknown: 'Unknown', event: 'Event', empty: 'No events yet.',
       unconfigured: 'Unconfigured', connecting: 'Connecting', online: 'Online (discovery answered)', reconnecting: 'Reconnecting',
@@ -33,12 +36,15 @@
       unavailable: 'The plugin or host is unavailable. Reload the plugin and review permissions.'
     },
     'zh-CN': {
-      stage: '连接预览 · 不含聊天', status: '连接状态', refresh: '刷新', discovered: '已发现运行时', running: '运行时正在运行',
+      stage: '基础聊天 Beta', status: '连接状态', refresh: '刷新', discovered: '已发现运行时', running: '运行时正在运行',
       visibility: '套接字在线不代表设备已在 Cloud 中可见。', settings: '连接设置', command: '粘贴 CLI 命令（仅解析，绝不执行）',
       parse: '解析命令', origin: '服务器源地址', connectorId: '连接器 ID', token: '连接器令牌', profile: '协议配置', current: '当前协议', legacy: '旧版协议',
-      consent: '允许连接到所选服务器。此预览不会共享任何会话。', connect: '连接', disconnect: '断开连接', boundaries: '预览限制',
+      consent: '允许连接到所选服务器。仅在下方另行勾选后才共享会话。', connect: '连接', disconnect: '断开连接', boundaries: '基础聊天 Beta 限制',
+      shareSessions: '向此服务器共享当前工作区路径、标题、用户及助手文字、模型标识和状态，并允许按会话现有权限远程创建、发送及中断。新会话需本地确认 Ask 模式。断开不会终止已接收的任务。',
+      runtimeId: '运行时实例 ID', sharingEnabled: '已允许会话共享', sharingReady: '共享已就绪', workspaceName: '已授权工作区', sessionCount: '共享会话数', lastSyncAt: '上次状态同步',
+      runtimeSetup: '在 Anywhere 网页端或桌面端的设备设置中添加 Pi 运行时实例，保存其空配置，然后启用。仅发现运行时不会创建实例。',
       security: '不会自动降级协议，也不会保存令牌。自托管服务器必须在清单中明确列入主机白名单，不支持通配符。',
-      verification: '新版仅经过离线测试，尚未通过 Cloud 实测。旧版 v0.1.7 的原版服务端不接受 Pi Runtime，暂不可用。目前不共享会话、不提供聊天。',
+      verification: '新版仅经过离线测试，尚未通过 Cloud 实测。旧版 v0.1.7 的原版服务端不接受 Pi Runtime，暂不可用。本地授权后支持会话列表、创建、发送、中断及最终回复状态同步。不支持远程工具审批或细粒度流式传输；本地工具权限可能需要在本地等待审批。',
       logs: '连接事件', logPrivacy: '只显示已知事件代码和受限诊断信息，不显示凭据或远端错误正文。',
       yes: '是', no: '否', unknown: '未知', event: '事件', empty: '暂无事件。',
       unconfigured: '未配置', connecting: '正在连接', online: '在线（已应答发现请求）', reconnecting: '正在重新连接',
@@ -82,9 +88,34 @@
     permission_denied: '宿主拒绝了权限，请重新加载插件并授权已声明的权限。',
     not_found: '未找到插件操作，请检查安装包与面板是否为同一版本。'
   });
+  const sessionErrors = {
+    workspace_unavailable: ['Select a local workspace before sharing.', '共享前请先选择本地工作区。'],
+    workspace_changed: ['Workspace changed. Reconnect locally to approve sharing again.', '工作区已改变，请在本地重新连接并授权共享。'],
+    workspace_denied: ['Remote workspace switching is not allowed.', '不允许远程切换工作区。'],
+    host_api_unavailable: ['Required Pi APIs are unavailable. Check host version and permissions.', '所需 Pi API 不可用，请检查宿主版本及权限。'],
+    host_operation_failed: ['Pi operation failed. Inspect the local session and permissions.', 'Pi 操作失败，请检查本地会话及权限。'],
+    host_response_invalid: ['Pi returned an invalid session response.', 'Pi 返回了无效会话数据。'],
+    sharing_disabled: ['Enable workspace sharing locally and reconnect.', '请在本地启用工作区共享并重新连接。'],
+    sharing_inactive: ['Sharing stopped or is waiting for its runtime instance.', '共享已停止或正在等待运行时实例。'],
+    session_unavailable: ['Session is not available in the approved workspace.', '授权工作区中没有可用的目标会话。'],
+    session_busy: ['Wait for the current session operation to finish.', '请等待当前会话操作结束。'],
+    session_identity_conflict: ['Session identity conflicts with the saved binding.', '会话标识与已保存映射冲突。'],
+    creation_permission_denied: ['Native confirmation was not completed; a blank session may remain.', '宿主确认未完成，可能留下空白会话。'],
+    model_unavailable: ['Select an available configured Pi model.', '请选择 Pi 中已配置的可用模型。'],
+    mapping_invalid: ['Saved mappings need local review; no automatic reset is performed.', '已保存映射需要本地检查，不会自动重置。'],
+    mapping_limit: ['Saved mapping limit reached. Review local mappings before cleanup.', '已达映射存储上限，请检查本地映射后再清理。'],
+    duplicate_request_conflict: ['A request ID was reused with different content.', '同一请求 ID 被用于不同内容。'],
+    operation_outcome_unknown: ['Delivery is uncertain. Inspect Pi before submitting another message.', '发送结果不确定，请检查 Pi 会话后再提交消息。'],
+    ingest_failed: ['Session upload failed; synchronization will retry.', '会话上传失败，将重试同步。'],
+    ingest_rejected: ['Server rejected session updates. Check protocol compatibility.', '服务器拒绝了会话更新，请检查协议兼容性。']
+  };
+  for (const [code, [en, zh]] of Object.entries(sessionErrors)) { words.en[code] = en; words['zh-CN'][code] = zh; }
+  Object.assign(words.en, { session_sync_failed: 'Session synchronization failed', sharing_stopped: 'Session sharing stopped', ingest_http: 'Session upload HTTP status', ingest_auth: 'Refreshing upload authentication' });
+  Object.assign(words['zh-CN'], { session_sync_failed: '会话同步失败', sharing_stopped: '会话共享已停止', ingest_http: '会话上传 HTTP 状态', ingest_auth: '正在刷新上传认证' });
   const states = new Set(['unconfigured', 'connecting', 'online', 'reconnecting', 'authentication_failed', 'protocol_incompatible', 'network_error', 'disconnected', 'ownership_conflict']);
   const errorCodes = new Set(['authentication_failed', 'protocol_incompatible', 'network_error', 'ownership_conflict', 'request_failed', 'bridge_unavailable', 'bridge_timeout', 'permission_denied', 'not_found', 'invalid_response', 'consent_required', 'invalid_config', 'invalid_command', 'insecure_origin', 'domain_not_allowed', 'profile_unavailable', 'unsupported', 'unavailable']);
   errorCodes.add('parser_unavailable');
+  for (const code of Object.keys(sessionErrors)) errorCodes.add(code);
   let locale = document.documentElement.lang === 'zh-CN' ? 'zh-CN' : 'en';
   let status = null;
   let firstStatus = true;
@@ -95,10 +126,11 @@
   let queue = Promise.resolve();
   const text = (key) => words[locale][key] || words[locale].unknown;
   const fail = (code) => Object.assign(new Error(code), { code });
-  const PANEL_VERSION = '2.0.0-alpha.5';
+  const PANEL_VERSION = '2.0.0-beta.1';
   const localLogs = [];
   const events = new Set(['panel_ready', 'bridge_request', 'bridge_failure', 'status_received', 'panel_error', 'form_invalid', 'plugin_loaded', 'connect_received', 'configuration_rejected', 'protocol', 'auth_request', 'auth_http', 'websocket_connect', 'websocket_open', 'rpc', 'retry_scheduled', ...states]);
   events.add('command_parse'); events.add('command_parsed');
+  for (const code of ['session_sync_failed', 'sharing_stopped', 'ingest_http', 'ingest_auth']) events.add(code);
   function safeCode(error) {
     const code = error?.code ?? error?.errorCode ?? error?.data?.errorCode;
     if (typeof code === 'string' && errorCodes.has(code.toLowerCase())) return code.toLowerCase();
@@ -118,18 +150,20 @@
     const time = typeof entry?.time === 'string' && /^\d{4}-\d{2}-\d{2}T[\d:.Z+-]{8,24}$/.test(entry.time) ? entry.time : '';
     const value = typeof entry?.detail === 'string' ? entry.detail : '';
     const fixed = new Set(['FRAME_LIMIT', 'INVALID_JSON', 'INVALID_RPC_FRAME', 'REQUEST_LIMIT', 'RPC_ID_REUSED', 'HOST_NETWORK_ERROR', 'HOST_API_OR_PERMISSION_UNAVAILABLE', 'INVALID_HTTP_RESPONSE', 'INVALID_AUTH_RESPONSE', 'INVALID_AUTH_JSON', 'INVALID_AUTH_FIELDS', 'INVALID_SOCKET_HANDLE', 'RUNTIME_DISCOVERY_TIMEOUT', 'EARLY_EVENT_LIMIT', 'VERSION_UNKNOWN', ...[...errorCodes].map(code => code.toUpperCase())]);
-    const allowed = /^(?:\d{1,5}(?:ms)?|\d+\.\d+\.\d+(?:-alpha\.\d+)?|WS_CLOSE_\d{1,4}|HTTP_\d{3}|(?:current|legacy):[a-f0-9]{40}|(?:runtime\.(?:discover|configSchema|config|validateConfig|start|stop|capabilities)|unsupported_method):(?:ok|invalid_params|runtime_conflict|runtime_not_found|runtime_not_running|method_not_found|internal_error)|(?:AUTH|WS_CONNECT|WS_EVENT|RPC_SEND|RPC|HEARTBEAT):(?:PERMISSION_DENIED|DOMAIN_NOT_ALLOWED|UNSUPPORTED|DNS_FAILURE|TLS_FAILURE|TIMEOUT|CONNECTION_REFUSED|CONNECTION_RESET|PROXY_FAILURE|HOST_NETWORK_ERROR|HTTP_\d{3}))$/;
+    const allowed = /^(?:\d{1,5}(?:ms)?|\d+\.\d+\.\d+(?:-(?:alpha|beta)\.\d+)?|WS_CLOSE_\d{1,4}|HTTP_\d{3}|(?:current|legacy):[a-f0-9]{40}|(?:runtime\.(?:discover|configSchema|config|validateConfig|start|stop|capabilities)|unsupported_method):(?:ok|invalid_params|runtime_conflict|runtime_not_found|runtime_not_running|method_not_found|internal_error)|(?:AUTH|WS_CONNECT|WS_EVENT|RPC_SEND|RPC|HEARTBEAT):(?:PERMISSION_DENIED|DOMAIN_NOT_ALLOWED|UNSUPPORTED|DNS_FAILURE|TLS_FAILURE|TIMEOUT|CONNECTION_REFUSED|CONNECTION_RESET|PROXY_FAILURE|HOST_NETWORK_ERROR|HTTP_\d{3}))$/;
     const bridge = value.match(/^(app\.getAppearance|anywhere\.(?:status|parse|connect|disconnect))(?::([a-z_]+))?$/);
     const field = event === 'form_invalid' && ['serverUrl', 'connectorId', 'connectorToken'].includes(value);
     const endpoint = ['auth_request', 'websocket_connect'].includes(event) && /^(?:https?|wss?):\/\/[A-Za-z0-9.:[\]-]+\/(?:api\/v2\/)?connector\/(?:auth|ws)$/.test(value);
-    const detail = value.length <= 4096 && (fixed.has(value) || allowed.test(value) || (bridge && (!bridge[2] || errorCodes.has(bridge[2]))) || field || endpoint) ? value : '';
+    const rpc = value.match(/^((?:session|runtime)\.[A-Za-z_.]+):([a-z_]+)$/);
+    const sessionRpc = rpc && ['session.discover', 'session.create', 'session.send_message', 'session.interrupt', 'session.sync', 'session.state', 'session.capabilities', 'session.notices', 'session.selections.update', 'session.commands', 'runtime.modelCatalog', 'runtime.permissionCatalog', 'runtime.commands'].includes(rpc[1]) && (['ok', 'invalid_params', 'runtime_not_running', 'internal_error'].includes(rpc[2]) || errorCodes.has(rpc[2]));
+    const detail = value.length <= 4096 && (fixed.has(value) || errorCodes.has(value) || value === 'WORKSPACE_OR_HOST_CHANGED' || allowed.test(value) || sessionRpc || (bridge && (!bridge[2] || errorCodes.has(bridge[2]))) || field || endpoint) ? value : '';
     return { time, event, detail, source };
   }
   function entries() {
     return [...localLogs.map(entry => safeEntry(entry, 'panel')), ...(Array.isArray(status?.logs) ? status.logs.slice(0, 80).map(entry => safeEntry(entry, 'plugin')) : [])].sort((a, b) => b.time.localeCompare(a.time)).slice(0, 120);
   }
   function report() {
-    const backend = typeof status?.pluginVersion === 'string' && /^\d+\.\d+\.\d+(?:-alpha\.\d+)?$/.test(status.pluginVersion) ? status.pluginVersion : 'unknown';
+    const backend = typeof status?.pluginVersion === 'string' && /^\d+\.\d+\.\d+(?:-(?:alpha|beta)\.\d+)?$/.test(status.pluginVersion) ? status.pluginVersion : 'unknown';
     return [`Agents Anywhere diagnostic report`, `Panel: ${PANEL_VERSION}`, `Plugin: ${backend}`, `Bridge: ${typeof window.pluginBridge?.invoke === 'function' ? 'present' : 'missing'}`, `State: ${states.has(status?.state) ? status.state : 'unknown'}`, 'Credentials and command text excluded.', '', ...entries().map(entry => `${entry.time} [${entry.source}] ${entry.event}${entry.detail ? `: ${entry.detail}` : ''}`)].join('\n');
   }
 
@@ -173,6 +207,21 @@
       $(key).textContent = text(typeof value === 'boolean' ? (value ? 'yes' : 'no') : 'unknown');
       $(key).dataset.active = String(value === true);
     }
+    const bounded = value => typeof value === 'string' && value.trim() ? value.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 160) : text('unknown');
+    const sharing = status?.sharing;
+    const values = {
+      runtimeId: bounded(status?.runtime?.runtimeId),
+      workspaceName: sharing?.enabled === true ? bounded(sharing.workspaceName) : '—',
+      sessionCount: Number.isSafeInteger(sharing?.sessionCount) && sharing.sessionCount >= 0 ? String(sharing.sessionCount) : text('unknown'),
+      lastSyncAt: typeof sharing?.lastSyncAt === 'string' && /^\d{4}-\d{2}-\d{2}T[\d:.Z+-]{8,24}$/.test(sharing.lastSyncAt) ? sharing.lastSyncAt : '—'
+    };
+    for (const [id, value] of Object.entries(values)) if ($(id)) $(id).textContent = value;
+    for (const [id, value] of [['sharingEnabled', sharing?.enabled], ['sharingReady', sharing?.ready]]) {
+      if (!$(id)) continue;
+      $(id).textContent = text(typeof value === 'boolean' ? (value ? 'yes' : 'no') : 'unknown');
+      $(id).dataset.active = String(value === true);
+    }
+    if ($('runtimeSetup')) $('runtimeSetup').hidden = !(status?.state === 'online' && !status?.runtime?.running);
     for (const option of $('profile').options) {
       const entry = status?.profiles?.find((item) => item?.id === option.value);
       option.disabled = !entry || entry.enabled !== true;
@@ -244,6 +293,7 @@
     $(id).addEventListener('input', () => {
       $(id).dataset.edited = 'true';
       $('consent').checked = false;
+      if ($('shareSessions')) $('shareSessions').checked = false;
       controls();
     });
   }
@@ -258,6 +308,7 @@
         $(key).value = result[key]; $(key).dataset.edited = 'true';
       }
       $('command').value = ''; $('consent').checked = false;
+      if ($('shareSessions')) $('shareSessions').checked = false;
       message = 'parsed'; localLog('command_parsed');
     } catch (error) {
       message = safeCode(error); localLog('panel_error', message.toUpperCase());
@@ -269,7 +320,8 @@
     if (!$('consent').checked || $('profile').selectedOptions[0]?.disabled) return;
     const args = {
       serverUrl: $('serverUrl').value.trim(), connectorId: $('connectorId').value.trim(),
-      connectorToken: $('connectorToken').value, profile: $('profile').value, consent: true
+      connectorToken: $('connectorToken').value, profile: $('profile').value, consent: true,
+      shareSessions: $('shareSessions')?.checked === true
     };
     void action(async () => {
       message = '';
@@ -278,6 +330,7 @@
       $('connectorToken').value = '';
       $('command').value = '';
       $('consent').checked = false;
+      if ($('shareSessions')) $('shareSessions').checked = false;
       message = 'accepted';
       await refresh();
     }, true);
@@ -310,6 +363,7 @@
     $('connectorToken').value = '';
     $('command').value = '';
     $('consent').checked = false;
+    if ($('shareSessions')) $('shareSessions').checked = false;
     controls();
   }, { once: true });
 })();

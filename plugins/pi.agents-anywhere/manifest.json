@@ -1,26 +1,26 @@
 {
   "schemaVersion": 1,
   "id": "pi.agents-anywhere",
-  "name": "Agents Anywhere — Connection Preview",
-  "version": "2.0.0-alpha.5",
-  "description": "Phase 2 connection preview: explicit Connector authentication, runtime discovery and diagnostics. No remote session access yet.",
+  "name": "Agents Anywhere — Workspace Chat Beta",
+  "version": "2.0.0-beta.1",
+  "description": "Opt-in workspace chat through the current Agents Anywhere Connector protocol: discover, create, send, sync replies, interrupt and reconnect.",
   "i18n": {
     "en": {
-      "name": "Agents Anywhere — Connection Preview",
-      "description": "Connect Pi Desktop to a verified Agents Anywhere protocol. Connection and runtime lifecycle only; chat is not implemented yet.",
-      "safetyNotes": "Explicitly connects to the declared server using credentials kept in memory. Sends runtime identity and heartbeats, not sessions or files. No commands are executed from pasted text. Background connection stops on disconnect or unload. Experimental, not Cloud-certified. Host-managed redirects require security review."
+      "name": "Agents Anywhere — Workspace Chat Beta",
+      "description": "Share the selected workspace's Pi sessions with Agents Anywhere. Discover sessions, create chats, send messages, sync text replies and interrupt turns.",
+      "safetyNotes": "High risk: separate sharing consent uploads workspace paths, session titles, user/assistant text, model identifiers and status to the declared server and permits remote prompts and interruption. Prompts may invoke local agent tools under each session's existing permissions; new sessions require native confirmation for Ask mode. Credentials stay in memory; only scoped IDs, hashes and operation receipts persist. No pasted command execution or remote approval bypass. Disconnect stops sharing, not an already accepted agent turn. Beta: real Cloud acceptance and redirect security review remain pending."
     },
     "zh-CN": {
-      "name": "Agents Anywhere — 连接预览",
-      "description": "通过经核实的协议连接 Agents Anywhere。目前仅支持连接与 Runtime 生命周期，尚未实现会话聊天。",
-      "safetyNotes": "仅在确认后连接声明的服务器，凭据只驻留内存。发送 Runtime 标识和心跳，不发送会话或文件。粘贴的命令不会执行。断开或卸载时停止后台连接。实验版本，尚未通过 Cloud 实测；宿主自动重定向仍需安全核验。"
+      "name": "Agents Anywhere — 工作区聊天 Beta",
+      "description": "经单独确认后共享当前工作区的 Pi 会话，支持发现会话、新建聊天、发送消息、同步文字回复和中断任务。",
+      "safetyNotes": "高风险：单独确认共享后，将工作区路径、会话标题、用户及助手文字、模型标识和状态上传至声明的服务器，并允许远程发消息及中断。消息可能按会话现有权限调用本地 Agent 工具；新建会话须通过宿主确认启用 Ask 模式。凭据仅驻留内存，仅持久化分域 ID、摘要和操作回执。不执行粘贴命令，不绕过审批。断开停止共享，但不终止已接收的任务。Beta 尚待真实 Cloud 验收与重定向安全核验。"
     }
   },
   "author": "PI-Desktop Plugin Contributors",
   "main": "main.js",
   "categories": ["productivity"],
-  "changelog": "2.0.0-alpha.5: fix runtime startup by treating server configRevision as a nonnegative safe integer, independent of schema revision. Preserve the applied revision in config responses and report specific validation failures. Permissions unchanged.",
-  "permissions": ["ui.panel", "ui.view", "net.fetch", "net.websocket", "background.service"],
+  "changelog": "2.0.0-beta.1: add explicit workspace sharing, native Pi session discovery/create/send/interrupt, bounded text and status ingest, model catalog, durable scoped deduplication and reconnect recovery. Add desktop.control and models.list permissions. Advanced capabilities and legacy compatibility remain disabled.",
+  "permissions": ["ui.panel", "ui.view", "net.fetch", "net.websocket", "background.service", "desktop.control", "models.list"],
   "net": { "domains": ["web.agents-anywhere.com"] },
   "engines": { "piDesktop": ">=0.15.9" },
   "activationEvents": ["onStartup", "onCommand:pi-agents-anywhere.open"],
