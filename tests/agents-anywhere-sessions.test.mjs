@@ -204,3 +204,37 @@ test('discovery pagination does not revoke access to bound sessions beyond the f
   f.service.pollCursor = '100'; await f.service.tick(); assert.equal(f.service.pollCursor, null);
   for (const cursor of [-1, 'bad', '9'.repeat(30)]) assert.equal((await f.rpc('session.discover', { ...scope, cursor })).error.code, 'invalid_params');
 });
+
+test('send accepts equivalent cwd spelling but rejects other directories before prompting', async t => {
+  const f = await fixture(); t.after(() => f.client.disconnect());
+  const params = { ...scope, sessionId: 'cwd-test', externalSessionId: 'existing', content: 'Equivalent workspace' };
+  const equivalent = [root + path.sep, path.join(root, 'child', '..')];
+  if (process.platform === 'win32') equivalent.push(root.replaceAll('\\', '/'), root.toUpperCase());
+  for (const [i, cwd] of equivalent.entries()) {
+    const response = await f.rpc('session.send_message', { ...params, cwd, clientMessageId: `cwd-${i}` });
+    assert.equal(response.ok, true, JSON.stringify(response.error));
+    f.state.running.delete('existing');
+  }
+  const count = f.state.calls.filter(c => c.operation === 'agent/prompt').length;
+  for (const cwd of [path.dirname(root), root + '-other', path.join(root, 'child'), '.', 'child/..', '', 123, { path: root }]) {
+    assert.equal((await f.rpc('session.send_message', { ...params, cwd, clientMessageId: randomUUID() })).error.code, 'workspace_denied');
+  }
+  assert.equal(f.state.calls.filter(c => c.operation === 'agent/prompt').length, count);
+});
+
+test('text projection omits blank messages that Android renders as unknown timeline items', async t => {
+  const f = await fixture(); t.after(() => f.client.disconnect());
+  const b = await f.service.store.bind(scope.runtimeId, 'empty-test', 'existing');
+  const messages = [
+    { id: 'empty-user', role: 'user', content: '' },
+    { id: 'whitespace-user', role: 'user', content: ' \n\t' },
+    { id: 'empty-assistant', role: 'assistant', content: '' },
+    { id: 'clipped', role: 'user', content: ' '.repeat(16000) + 'later' },
+    { id: 'user-text', role: 'user', content: 'hello' },
+    { id: 'assistant-text', role: 'assistant', content: '**reply**' },
+  ];
+  const items = f.service.timeline(b, { messages, messageStart: 10 });
+  assert.deepEqual(items.map(i => i.source.itemId), ['user-text', 'assistant-text']);
+  assert.deepEqual(items.map(i => i.orderSeq), [15, 16]);
+  assert.ok(items.every(i => i.type === 'message' && i.content.kind === 'markdown' && i.content.text.trim()));
+});

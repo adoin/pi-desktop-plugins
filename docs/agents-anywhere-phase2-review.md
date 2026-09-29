@@ -1,6 +1,6 @@
 # Agents Anywhere implementation checkpoints and security record
 
-Current checkpoint: **2.0.0-beta.1 basic workspace chat**, described at the end
+Current checkpoint: **2.0.0-beta.2 basic workspace chat**, described at the end
 of this record. Earlier alpha sections are historical, not current capability
 claims. Real Cloud chat acceptance and production approval remain pending.
 
@@ -396,3 +396,41 @@ pack-tool `dist` output briefly caused one additional source-file-set mismatch;
 it was removed after copying the verified artifact and the preflight was rerun.
 The global release gate remains red and is not waived. No remote push or
 marketplace publication was performed.
+
+## Mobile send follow-up: 2.0.0-beta.2
+
+User diagnostics show successful runtime start/state/capability calls followed by
+`session.send_message:workspace_denied`. The original cwd value is deliberately
+absent from diagnostics, so its exact spelling is not asserted. Source inspection
+found raw string comparison in `SessionService.validateTurn`, unlike the native
+bridge's canonical workspace checks. Upstream `_clean_workspace_path` in
+`server/agent_server/infra/repositories/projects.py` normalizes Windows paths;
+equivalent separators, case and trailing separators are therefore valid inputs.
+The new regression failed on beta.1 and passes using the bridge's existing
+canonical comparison. Other directories, relative/empty/non-string paths remain
+denied before any prompt. No permission, destination or sharing-scope expansion.
+
+The Android screenshot's `message / markdown` diagnostic is not evidence that
+Markdown is unsupported. At the pinned upstream commit,
+`SessionTimelineProjection.kt:104-115` renders blank non-assistant messages
+without attachments as diagnostics. A regression reproduces beta.1 exporting
+empty/whitespace text, including text that becomes blank at the 16k limit.
+Beta.2 omits these records while preserving nonempty content, IDs and order
+offsets. Existing server history is not deleted or rewritten automatically.
+
+Changes: `pi-bridge.js`, `sessions.js`, version/README/panel diagnostic version,
+two session regressions and matching manifest/panel tests. Complete runtime diff
+and packed contents were inspected locally. High-risk classification, the need
+for two human maintainer approvals, and redirect/publication gates remain;
+this maintenance build is not approval to publish.
+
+Verification: targeted suite plus panel chrome **141/141 passed**; full suite
+**313/319 passed**, with the same six unrelated Windows gitlens/terminal failures.
+Scoped security audit: **zero blockers**, 13 review signals. Package validation
+passed. Artifact: **18 source-identical store-only files**, **134,637 bytes**,
+`packages/pi.agents-anywhere-2.0.0-beta.2.piplug`.
+SHA-256: `6ef3e63e72d82b7bbada2093f136451bdc90e6f25c0bdaa7edc9e04167f6cb84`.
+Catalog rebuilt with matching size/hash; unrelated entries unchanged. Full
+package security audit still reports **342 existing other-package blockers**,
+none for this plugin. Real mobile sending after this fix remains unverified.
+No automatic resend, history deletion, push or marketplace publication occurred.

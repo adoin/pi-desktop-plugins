@@ -50,6 +50,7 @@ class PiBridge {
   }
 
   invalidate() { this.epoch++; }
+  matchesWorkspace(value) { return canonical(value) === this.boundPath; }
   guard() { if (this.context.getStore() !== undefined && this.context.getStore() !== this.epoch) fail('sharing_inactive', 'Session sharing was cancelled during the host operation.'); }
   async checkWorkspace() {
     this.guard();

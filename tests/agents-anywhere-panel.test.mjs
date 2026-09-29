@@ -210,7 +210,7 @@ test('sharing status and runtime instance are bounded, distinct and excluded fro
   const f = fixture(); await flush(); const n = f.nodes;
   assert.equal(n.sharingReady.textContent, 'Unknown'); assert.equal(n.runtimeSetup.hidden, true);
   const privatePath = 'C:\\private\\workspace';
-  f.status.pluginVersion = '2.0.0-beta.1';
+  f.status.pluginVersion = '2.0.0-beta.2';
   f.status.state = 'online'; f.status.runtime = { discovered: true, running: false, runtimeId: 'instance-'.repeat(40) };
   f.status.sharing = { enabled: true, ready: false, workspaceName: '<workspace>'.repeat(40), workspacePath: privatePath, sessionCount: 3, lastSyncAt: '2026-01-01T00:00:00.000Z' };
   f.intervals.get(1)(); await flush();
@@ -221,7 +221,7 @@ test('sharing status and runtime instance are bounded, distinct and excluded fro
   assert.match(n.runtimeSetup.textContent, /save its empty config, then enable it/);
   f.callbacks.get('locale')('zh-CN'); assert.match(n.runtimeSetup.textContent, /保存其空配置/);
   f.callbacks.get('locale')('en'); n.diagnostics.emit('click');
-  assert.match(n.report.value, /Panel: 2\.0\.0-beta\.1/); assert.match(n.report.value, /Plugin: 2\.0\.0-beta\.1/);
+  assert.match(n.report.value, /Panel: 2\.0\.0-beta\.2/); assert.match(n.report.value, /Plugin: 2\.0\.0-beta\.2/);
   for (const privateValue of [privatePath, '<workspace>', 'instance-']) assert.ok(!n.report.value.includes(privateValue));
   f.status.runtime.running = true; f.status.sharing = { enabled: false, ready: true, workspaceName: 'not approved', sessionCount: -1, lastSyncAt: privatePath };
   f.intervals.get(1)(); await flush();

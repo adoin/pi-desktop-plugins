@@ -83,6 +83,9 @@ class SessionService {
     for (const [index, m] of (detail.messages || []).entries()) {
       if (!['user', 'assistant'].includes(m.role) || m.parentToolCallId || typeof m.content !== 'string' || typeof m.id !== 'string') continue;
       const content = { kind: 'markdown', text: m.content.slice(0, 16000), format: 'markdown' };
+      // Android projects blank non-assistant messages as unknown timeline items.
+      // This text-only bridge cannot represent attachment-only or empty records.
+      if (!content.text.trim()) continue;
       const status = ({ streaming: 'running', error: 'failed', aborted: 'interrupted' })[m.status] || 'done';
       const contentHash = hash(JSON.stringify([content, status])); const itemId = `pi_${hash(`${b.aaId}:${m.id}`).slice(0, 32)}`;
       const previous = this.itemVersions.get(itemId); const revision = previous?.hash === contentHash ? previous.revision : Math.max(Date.now(), (previous?.revision || 0) + 1);
@@ -147,7 +150,7 @@ class SessionService {
   }
   validateTurn(params) {
     if (typeof params.content !== 'string' || !params.content.trim() || params.content.length > 32000) fail('invalid_params', 'Message content must contain 1–32000 characters.');
-    if (params.cwd != null && params.cwd !== this.bridge.workspace.path) fail('workspace_denied', 'Remote workspace switching is not allowed.');
+    if (params.cwd != null && !this.bridge.matchesWorkspace(params.cwd)) fail('workspace_denied', 'Remote workspace switching is not allowed.');
     for (const field of ['attachments', 'timelineAttachments']) if (params[field] != null && (!Array.isArray(params[field]) || params[field].length)) fail('unsupported', 'Attachments are not supported.');
     if (params.runtimeOptions != null && (!record(params.runtimeOptions) || Object.keys(params.runtimeOptions).length)) fail('unsupported', 'Runtime options are not supported.');
     if (params.selections?.model != null && (typeof params.selections.model !== 'string' || params.selections.model.length > 1024)) fail('invalid_params', 'Model selection must be a bounded identifier.');

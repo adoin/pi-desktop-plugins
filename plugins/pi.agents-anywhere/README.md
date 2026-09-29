@@ -1,9 +1,17 @@
 # Agents Anywhere — workspace chat beta
 
-Version: **2.0.0-beta.1**. Basic chat implementation for the current official
+Version: **2.0.0-beta.2**. Basic chat implementation for the current official
 Connector protocol. This is a local development/acceptance build, **not a
 production-approved or fully compatible v2 release**. Offline integration tests
 are not proof of live Cloud/mobile acceptance.
+
+Beta.2 fixes false `workspace_denied` rejections caused by equivalent Windows
+path spellings (separator, case or trailing separator). Remote cwd uses the same
+canonical comparison as the native host bridge; other directories remain denied.
+Blank text-only messages are no longer exported because Android renders blank
+non-assistant messages as unknown items. Markdown itself is a supported format.
+Already uploaded blank history entries are not deleted automatically.
+Reload/reconnect after upgrading; keep the existing configured Pi instance.
 
 ## Setup and acceptance
 

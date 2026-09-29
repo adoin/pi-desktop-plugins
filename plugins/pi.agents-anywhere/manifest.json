@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "pi.agents-anywhere",
   "name": "Agents Anywhere — Workspace Chat Beta",
-  "version": "2.0.0-beta.1",
+  "version": "2.0.0-beta.2",
   "description": "Opt-in workspace chat through the current Agents Anywhere Connector protocol: discover, create, send, sync replies, interrupt and reconnect.",
   "i18n": {
     "en": {
@@ -19,7 +19,7 @@
   "author": "PI-Desktop Plugin Contributors",
   "main": "main.js",
   "categories": ["productivity"],
-  "changelog": "2.0.0-beta.1: add explicit workspace sharing, native Pi session discovery/create/send/interrupt, bounded text and status ingest, model catalog, durable scoped deduplication and reconnect recovery. Add desktop.control and models.list permissions. Advanced capabilities and legacy compatibility remain disabled.",
+  "changelog": "2.0.0-beta.2: compare remote cwd using the existing host-native workspace canonicalization instead of raw strings; continue rejecting other workspaces. Omit blank text-only timeline records that Android displays as unknown items. Permissions unchanged.",
   "permissions": ["ui.panel", "ui.view", "net.fetch", "net.websocket", "background.service", "desktop.control", "models.list"],
   "net": { "domains": ["web.agents-anywhere.com"] },
   "engines": { "piDesktop": ">=0.15.9" },
