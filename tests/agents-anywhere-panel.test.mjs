@@ -17,10 +17,11 @@ class Element {
 function fixture(override, options = {}) {
   const ids = ['connect', 'disconnect', 'parse', 'refresh', 'diagnostics', 'report', 'consent', 'connection', 'profile', 'message', 'logs', 'state', 'discovered', 'running', 'serverUrl', 'connectorId', 'connectorToken', 'command'];
   ids.push('shareSessions', 'runtimeId', 'sharingEnabled', 'sharingReady', 'workspaceName', 'sessionCount', 'lastSyncAt', 'runtimeSetup');
+  ids.push('useSaved', 'rememberConnection', 'vaultPassword', 'savedState', 'forgetConsent', 'forgetConnection');
   const nodes = Object.fromEntries(ids.map(id => [id, new Element()]));
   nodes.profile.value = 'current'; nodes.profile.options = [new Element('current'), new Element('legacy')];
   Object.defineProperty(nodes.profile, 'selectedOptions', { get: () => nodes.profile.options.filter(option => option.value === nodes.profile.value) });
-  const fields = ['consent', 'shareSessions', 'profile', 'serverUrl', 'connectorId', 'connectorToken', 'command'].map(id => nodes[id]);
+  const fields = ['consent', 'shareSessions', 'profile', 'serverUrl', 'connectorId', 'connectorToken', 'command', 'useSaved', 'rememberConnection', 'vaultPassword', 'forgetConsent'].map(id => nodes[id]);
   nodes.connection.querySelectorAll = () => fields;
   const buttons = ['connect', 'disconnect', 'parse', 'refresh'].map(id => nodes[id]);
   for (const id of ['connect', 'disconnect', 'parse', 'refresh']) nodes[id].dataset.i18n = id;
@@ -210,7 +211,7 @@ test('sharing status and runtime instance are bounded, distinct and excluded fro
   const f = fixture(); await flush(); const n = f.nodes;
   assert.equal(n.sharingReady.textContent, 'Unknown'); assert.equal(n.runtimeSetup.hidden, true);
   const privatePath = 'C:\\private\\workspace';
-  f.status.pluginVersion = '2.0.0-beta.2';
+  f.status.pluginVersion = '2.0.0-beta.3';
   f.status.state = 'online'; f.status.runtime = { discovered: true, running: false, runtimeId: 'instance-'.repeat(40) };
   f.status.sharing = { enabled: true, ready: false, workspaceName: '<workspace>'.repeat(40), workspacePath: privatePath, sessionCount: 3, lastSyncAt: '2026-01-01T00:00:00.000Z' };
   f.intervals.get(1)(); await flush();
@@ -221,12 +222,48 @@ test('sharing status and runtime instance are bounded, distinct and excluded fro
   assert.match(n.runtimeSetup.textContent, /save its empty config, then enable it/);
   f.callbacks.get('locale')('zh-CN'); assert.match(n.runtimeSetup.textContent, /保存其空配置/);
   f.callbacks.get('locale')('en'); n.diagnostics.emit('click');
-  assert.match(n.report.value, /Panel: 2\.0\.0-beta\.2/); assert.match(n.report.value, /Plugin: 2\.0\.0-beta\.2/);
+  assert.match(n.report.value, /Panel: 2\.0\.0-beta\.3/); assert.match(n.report.value, /Plugin: 2\.0\.0-beta\.3/);
   for (const privateValue of [privatePath, '<workspace>', 'instance-']) assert.ok(!n.report.value.includes(privateValue));
   f.status.runtime.running = true; f.status.sharing = { enabled: false, ready: true, workspaceName: 'not approved', sessionCount: -1, lastSyncAt: privatePath };
   f.intervals.get(1)(); await flush();
   assert.equal(n.runtimeSetup.hidden, true); assert.equal(n.sharingReady.textContent, 'Yes');
   assert.equal(n.workspaceName.textContent, '—'); assert.equal(n.sessionCount.textContent, 'Unknown'); assert.equal(n.lastSyncAt.textContent, '—');
   assert.ok(f.calls.every(call => call.method === 'anywhere.status'));
+  f.callbacks.get('pagehide')();
+});
+
+test('encrypted saved connection restores fields without secrets or sharing consent', async () => {
+  const publicSaved = { profile: 'current', serverUrl: 'https://web.agents-anywhere.com', connectorId: 'saved-id', encrypted: true };
+  const f = fixture(method => method === 'anywhere.status' ? { ...publicSaved, savedConnection: publicSaved, profiles: [{ id: 'current', enabled: true }], logs: [] } : undefined);
+  await flush(); const n = f.nodes;
+  assert.equal(n.connectorId.value, 'saved-id'); assert.equal(n.useSaved.checked, true);
+  assert.equal(n.connectorToken.value, ''); assert.equal(n.connectorToken.required, false);
+  assert.equal(n.consent.checked, false); assert.equal(n.shareSessions.checked, false);
+  n.vaultPassword.value = randomUUID(); n.serverUrl.emit('input');
+  assert.equal(n.useSaved.checked, false); assert.equal(n.vaultPassword.value, ''); assert.equal(n.connectorToken.required, true);
+  f.callbacks.get('pagehide')();
+});
+
+test('password is submitted only to connect, cleared on failure, and absent from diagnostics', async () => {
+  let received; const password = randomUUID();
+  const f = fixture((method, args) => {
+    if (method === 'anywhere.connect') { received = { ...args }; throw Object.assign(new Error('private'), { code: 'unlock_failed' }); }
+  });
+  await flush(); const n = f.nodes;
+  n.rememberConnection.checked = true; n.rememberConnection.emit('change');
+  n.vaultPassword.value = password; n.consent.checked = true; n.connection.emit('submit'); await flush();
+  assert.equal(received.vaultPassword, password); assert.equal(received.rememberConnection, true);
+  assert.equal(n.vaultPassword.value, ''); assert.match(n.message.textContent, /unlock_failed/);
+  n.diagnostics.emit('click'); assert.ok(!n.report.value.includes(password));
+  n.vaultPassword.value = password; f.callbacks.get('pagehide')(); assert.equal(n.vaultPassword.value, '');
+});
+
+test('forget requires separate confirmation and clears only connection controls', async () => {
+  const f = fixture(method => method === 'anywhere.forget' ? {} : undefined); await flush(); const n = f.nodes;
+  n.forgetConnection.emit('click'); await flush(); assert.ok(!f.calls.some(c => c.method === 'anywhere.forget'));
+  n.forgetConsent.checked = true; n.forgetConsent.emit('change'); assert.equal(n.forgetConnection.disabled, false);
+  n.connectorToken.value = randomUUID(); n.vaultPassword.value = randomUUID(); n.forgetConnection.emit('click'); await flush();
+  assert.equal(f.calls.find(c => c.method === 'anywhere.forget').args.confirm, true);
+  assert.equal(n.vaultPassword.value, ''); assert.equal(n.connectorToken.value, ''); assert.equal(n.forgetConsent.checked, false);
   f.callbacks.get('pagehide')();
 });

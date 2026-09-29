@@ -43,12 +43,23 @@
         <div><label for="connectorToken" data-i18n="token">Connector token</label><input id="connectorToken" type="password" autocomplete="new-password" required /></div>
         <div class="wide"><label for="profile" data-i18n="profile">Protocol profile</label><select id="profile"><option value="current">Current</option><option value="legacy" disabled>Legacy</option></select></div>
       </div>
+      <fieldset class="saved-connection">
+        <legend data-i18n="savedTitle">Saved connection</legend>
+        <p data-i18n="savedHint">Address and ID are saved on Connect. Optionally encrypt the token with a password; the password is never saved. Upgrade in place; uninstall may remove plugin data.</p>
+        <p id="savedState" role="status"></p>
+        <label class="consent"><input id="useSaved" type="checkbox" /><span data-i18n="useSaved">Use the saved encrypted token</span></label>
+        <label class="consent"><input id="rememberConnection" type="checkbox" /><span data-i18n="rememberConnection">Encrypt and remember the entered token</span></label>
+        <label for="vaultPassword" data-i18n="vaultPassword">Encryption / unlock password (at least 12 characters)</label>
+        <input id="vaultPassword" type="password" autocomplete="off" maxlength="1024" />
+        <label class="consent"><input id="forgetConsent" type="checkbox" /><span data-i18n="forgetConsent">Disconnect and forget saved connection only; keep session mappings</span></label>
+        <button id="forgetConnection" type="button" data-i18n="forgetConnection" disabled>Forget saved connection</button>
+      </fieldset>
       <label class="consent"><input id="consent" type="checkbox" /><span data-i18n="consent">Allow connection to the selected server. Sessions are shared only if separately checked below.</span></label>
       <label class="consent"><input id="shareSessions" type="checkbox" /><span data-i18n="shareSessions">Share sessions in the currently open workspace and allow remote create/send/interrupt. Conversation text will be sent to this server; Pi local tool permissions still apply.</span></label>
       <div class="actions"><button id="connect" type="submit" data-i18n="connect" disabled>Connect</button><button id="disconnect" type="button" data-i18n="disconnect">Disconnect</button></div>
       <p id="message" role="alert"></p>
     </form>
-    <section class="card notes"><h2 data-i18n="boundaries">Basic chat beta boundaries</h2><p data-i18n="security">No automatic protocol downgrade. Tokens are not stored. Self-hosted servers require an explicit manifest host allowlist; wildcards are not supported.</p><p data-i18n="verification">Current protocol is tested offline, not Cloud-proven. Legacy v0.1.7 cannot register Pi and is disabled. Once locally allowed: session inventory, create/send/interrupt, and final response status sync. Remote tool approval and fine-grained streaming are not supported; local tool permissions may wait for approval locally.</p></section>
+    <section class="card notes"><h2 data-i18n="boundaries">Basic chat beta boundaries</h2><p data-i18n="security">No automatic downgrade or reconnect after restart. Optional password-encrypted token storage. Self-hosted servers remain restricted by the manifest allowlist.</p><p data-i18n="verification">Current protocol is tested offline, not Cloud-proven. Legacy v0.1.7 cannot register Pi and is disabled. Once locally allowed: session inventory, create/send/interrupt, and final response status sync. Remote tool approval and fine-grained streaming are not supported; local tool permissions may wait for approval locally.</p></section>
     <section class="card logs-card">
       <div class="row"><h2 data-i18n="logs">Connection events</h2><button id="diagnostics" type="button" data-i18n="diagnostics">Generate diagnostic report / 生成诊断报告</button></div>
       <p data-i18n="logPrivacy">Only recognized event codes and bounded diagnostic details are shown; credentials are excluded.</p>

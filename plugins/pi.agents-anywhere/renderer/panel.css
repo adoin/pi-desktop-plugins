@@ -134,3 +134,10 @@ button:disabled { opacity: .48; cursor: not-allowed; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   button:active:not(:disabled) { transform: none; }
 }
+
+.saved-connection { min-width: 0; margin: 20px 0; padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--field); }
+.saved-connection legend { padding: 0 8px; color: var(--accent); font-weight: 600; }
+.saved-connection p { color: var(--muted); font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
+.saved-connection #savedState { color: var(--fg); }
+.saved-connection input[type="password"] { width: 100%; }
+.saved-connection #forgetConnection { color: var(--danger); }

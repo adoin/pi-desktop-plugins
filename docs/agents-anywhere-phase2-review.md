@@ -1,6 +1,6 @@
 # Agents Anywhere implementation checkpoints and security record
 
-Current checkpoint: **2.0.0-beta.2 basic workspace chat**, described at the end
+Current checkpoint: **2.0.0-beta.3 basic workspace chat**, described at the end
 of this record. Earlier alpha sections are historical, not current capability
 claims. Real Cloud chat acceptance and production approval remain pending.
 
@@ -434,3 +434,73 @@ Catalog rebuilt with matching size/hash; unrelated entries unchanged. Full
 package security audit still reports **342 existing other-package blockers**,
 none for this plugin. Real mobile sending after this fix remains unverified.
 No automatic resend, history deletion, push or marketplace publication occurred.
+
+## Password-encrypted connection persistence: 2.0.0-beta.3
+
+The user explicitly selected password-encrypted persistence, not plaintext token
+storage. No plugin-facing OS-keychain API was found in the pinned host contract.
+The new `connection-store.js` uses only Node crypto and plugin-private settings;
+no shell, raw filesystem, native helper, network destination or permission was
+added. Self-hosted support is intentionally deferred until a suitable host API
+is available; the only allowlisted hostname remains `web.agents-anywhere.com`.
+
+### Capability / data flow
+
+| Entry | Persisted / transient data | Consent, bounds and cleanup |
+| --- | --- | --- |
+| Explicit Connect | Origin, profile and Connector ID in `anywhereConnectionV1` | Existing connection consent; exact allowlist still checked before decrypt/network |
+| Encrypt-and-remember checkbox | Versioned AES-256-GCM ciphertext, salt, IV, tag and fixed KDF parameters | Explicit opt-in and 12–1024-character password; scrypt N=32768/r=8/p=1, 64MiB max memory; random 16-byte salt, 12-byte IV, 16-byte tag |
+| Use saved token | Password and decrypted token transiently in process memory | Exact saved origin/profile/ID match; AAD binds all identity fields; wrong password/tampering fails before networking |
+| Startup / reload | Only public saved fields returned to panel | Offline; no token/ciphertext/password in status, no auto-connect or restored sharing consent |
+| Forget saved connection | Nulls only the connection-settings key | Separate confirmation; disconnects; retains `anywhereSessionBindingsV1` and unrelated settings |
+| Unload during save/unlock | Waits for in-flight settings/crypto operation | Immediately fences networking; drains old operations before the next plugin instance loads |
+
+Public state never exposes ciphertext or the plaintext token. The password is
+not persisted or cached; secret buffers are cleared in finally blocks. JavaScript
+string zeroization and protection against a compromised running host are not
+promised. Settings copied by an attacker permit offline password guessing, so
+the panel/README/install notes require a strong unique password. Forgotten
+passwords have no recovery mechanism. Uninstall may delete plugin data; users
+should upgrade in place, retain the existing Anywhere device/runtime, and unlock
+after reload rather than recreate their pairing.
+
+Ordinary metadata-only saves preserve a previous encrypted token only for the
+same identity; changing identity discards the old envelope. Deletion requires
+the explicit Forget action. Corrupt saved data is not silently overwritten.
+The actual connection/share consent is never stored. Credential field values,
+pasted commands, passwords and arbitrary exceptions are excluded from logs.
+
+One bounded independent agent review found a reload race: a new load could see
+the old store's busy guard and retain a permanent error. Unload now drains the
+pending load/save/unlock operation after fencing it. A regression verifies the
+saved envelope survives, the replacement loads without error, no stale network
+call occurs, and explicit unlock reconnects. No additional broad review was
+started. Agent review does not replace the two required human maintainer
+approvals, which remain pending for this high-risk release.
+
+### Verification and artifact
+
+- Real scrypt/GCM unit tests cover roundtrip/reload, randomized ciphertext,
+  wrong passwords, tampering, identity association, malformed/bounded envelopes,
+  failed storage, concurrency, and clearing only the intended setting.
+- Backend integration verifies encrypted reload, offline startup, fresh consent,
+  no secret exposure, unchanged domain restrictions, forgotten settings, and
+  disconnect/unload during persistence. Panel tests cover saved-mode restore,
+  password clearing, diagnostics privacy and explicit Forget confirmation.
+- Targeted suite plus panel chrome: **158/158 passed**. Full suite: **330/336
+  passed**, the same six pre-existing Windows gitlens/terminal failures.
+- JavaScript syntax and diff whitespace checks passed. Scoped security preflight:
+  **zero blockers**, 14 manual-review signals. `PluginCheck` passed for 19 files.
+- BrowserPreview displayed the bilingual persistence controls, masked password
+  input and unchecked remember opt-in; a 360px layout check found no overflow.
+  This is not a claim of installed-host or production credential testing.
+- `PluginPack`: **19 store-only files**, **153,769 bytes** at
+  `packages/pi.agents-anywhere-2.0.0-beta.3.piplug`.
+  SHA-256: `104f3c60e15ebf14694df9fa10029be64954186c0d21fc9df771eb963e01a241`.
+  Every file matches source bytes; manifest, entry set, no-symlink/no-traversal
+  and compression checks passed. Catalog rebuilt with 26 entries and matching
+  hash/size; unrelated entries unchanged.
+- Full security package audit: **342 existing other-package blockers**, none for
+  this plugin. Host redirect safety and human approvals remain publication gates.
+  No push or marketplace publication was performed; real host upgrade/unlock
+  acceptance remains to be exercised by the user.

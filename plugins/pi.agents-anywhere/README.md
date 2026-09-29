@@ -1,9 +1,36 @@
 # Agents Anywhere — workspace chat beta
 
-Version: **2.0.0-beta.2**. Basic chat implementation for the current official
+Version: **2.0.0-beta.3**. Basic chat implementation for the current official
 Connector protocol. This is a local development/acceptance build, **not a
 production-approved or fully compatible v2 release**. Offline integration tests
 are not proof of live Cloud/mobile acceptance.
+
+## Remembering a connection (beta.3)
+
+On Connect, the origin, Connector ID and protocol are saved locally. To retain
+the token too, check **Encrypt and remember the entered token**, enter a strong
+unique password (12–1024 characters), then confirm connection and sharing.
+After restart/upgrade, the fields restore automatically. Choose **Use saved
+encrypted token**, enter that password and confirm connection/sharing again.
+There is no startup auto-connect, stored unlock password or remembered sharing
+authorization. The plaintext token is never returned to the panel on unlock.
+
+Install updates over the existing plugin rather than uninstalling first. The
+plugin cannot guarantee retention when the host deletes plugin data on uninstall.
+Keep the existing Anywhere device and configured Pi instance. Forgetting a
+password cannot be reversed: use **Forget saved connection** after its explicit
+confirmation, then enter the original or newly issued Connector token. This
+disconnects and clears only connection settings, not session mappings/receipts.
+Connecting without selecting encryption leaves an existing encrypted token
+unchanged only for the same origin/profile/ID; use Forget to remove it explicitly.
+
+Storage uses asynchronous scrypt (N=32768, r=8, p=1) and AES-256-GCM with random
+salt/nonce. Authenticated metadata binds ciphertext to origin/profile/ID. This
+protects a settings file at rest, not a compromised running host; weak passwords
+permit offline guessing. Lost plugin data is not recoverable through this feature.
+There is no OS-keychain API claim, raw filesystem access or new permission.
+Self-hosted support is deferred until a suitable new host API is available; this
+build does not broaden the official-host allowlist.
 
 Beta.2 fixes false `workspace_denied` rejections caused by equivalent Windows
 path spellings (separator, case or trailing separator). Remote cwd uses the same
@@ -42,9 +69,9 @@ Reload/reconnect after upgrading; keep the existing configured Pi instance.
    disconnect the transport and verify instance recovery and no duplicate
    prompts after reconnect. Switching local workspaces must stop sharing.
 
-Credentials are memory-only and cleared from panel fields on accepted Connect.
-Disconnect/unload clears the connection's credential references; restart requires
-local re-entry. Closing the panel does **not** stop the opted-in background
+Plaintext credentials are used in memory and cleared from panel fields on accepted
+Connect. Optional encrypted storage survives disconnect/unload; restart requires
+local password unlock or token re-entry. Closing the panel does **not** stop the background
 connection. Disconnect stops synchronization/remote control but does **not**
 abort an already accepted Pi turn. Use Interrupt or the local session to stop it.
 Do not run two Connectors using the same identity.
@@ -92,9 +119,10 @@ remote approval bypass.
 | `desktop.control` | Enumerate/read/create/configure Pi sessions, prompt, status and abort |
 | `models.list` | Read configured model identifiers/labels, never provider credentials |
 
-Only IDs, hashes, mapping scope and accepted-operation receipts persist in plugin
-settings (`anywhereSessionBindingsV1`). Tokens, commands and transcript text do
-not. Do not manually remove receipts to retry an uncertain operation: inspect
+Session IDs, hashes, mapping scope and accepted-operation receipts persist under
+`anywhereSessionBindingsV1`. Connection metadata and the optional encrypted token
+are stored separately under `anywhereConnectionV1`. Passwords, plaintext tokens,
+commands and transcripts are never persisted. Do not remove receipts to retry an uncertain operation: inspect
 its native Pi session first. Automatic migration from the old plugin's token
 files or mappings is not attempted. Retain old non-secret settings manually and
 disable the previous Connector before testing.

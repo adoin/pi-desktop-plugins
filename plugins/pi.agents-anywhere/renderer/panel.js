@@ -14,7 +14,7 @@
       runtimeId: 'Runtime instance ID', sharingEnabled: 'Session sharing allowed', sharingReady: 'Sharing ready', workspaceName: 'Approved workspace', sessionCount: 'Shared sessions', lastSyncAt: 'Last status sync',
       runtimeSetup: 'In Anywhere Web/desktop device settings, add the Pi runtime instance, save its empty config, then enable it. Discovery alone does not create an instance.',
       connect: 'Connect', disconnect: 'Disconnect', boundaries: 'Basic chat beta boundaries',
-      security: 'No automatic protocol downgrade. Tokens are not stored. Self-hosted servers require an explicit manifest host allowlist; wildcards are not supported.',
+      security: 'No automatic downgrade or reconnect after restart. Optional password-encrypted token storage. Self-hosted domains stay restricted until a future host API supports them.',
       verification: 'Current protocol is tested offline, not Cloud-proven. Legacy v0.1.7 cannot register Pi on its stock server and is disabled. Once locally allowed: session inventory, create/send/interrupt, and final response status sync. Remote tool approval and fine-grained streaming are not supported; local tool permissions may wait for approval locally.',
       logs: 'Connection events', logPrivacy: 'Only recognized event codes and bounded diagnostic details are shown. Credentials and remote error bodies are excluded.',
       yes: 'Yes', no: 'No', unknown: 'Unknown', event: 'Event', empty: 'No events yet.',
@@ -43,7 +43,7 @@
       shareSessions: '向此服务器共享当前工作区路径、标题、用户及助手文字、模型标识和状态，并允许按会话现有权限远程创建、发送及中断。新会话需本地确认 Ask 模式。断开不会终止已接收的任务。',
       runtimeId: '运行时实例 ID', sharingEnabled: '已允许会话共享', sharingReady: '共享已就绪', workspaceName: '已授权工作区', sessionCount: '共享会话数', lastSyncAt: '上次状态同步',
       runtimeSetup: '在 Anywhere 网页端或桌面端的设备设置中添加 Pi 运行时实例，保存其空配置，然后启用。仅发现运行时不会创建实例。',
-      security: '不会自动降级协议，也不会保存令牌。自托管服务器必须在清单中明确列入主机白名单，不支持通配符。',
+      security: '不会自动降级或在重启后自动连接。可选择用密码加密保存令牌。自部署域名仍受限制，待后续宿主 API 更新后接入。',
       verification: '新版仅经过离线测试，尚未通过 Cloud 实测。旧版 v0.1.7 的原版服务端不接受 Pi Runtime，暂不可用。本地授权后支持会话列表、创建、发送、中断及最终回复状态同步。不支持远程工具审批或细粒度流式传输；本地工具权限可能需要在本地等待审批。',
       logs: '连接事件', logPrivacy: '只显示已知事件代码和受限诊断信息，不显示凭据或远端错误正文。',
       yes: '是', no: '否', unknown: '未知', event: '事件', empty: '暂无事件。',
@@ -112,10 +112,33 @@
   for (const [code, [en, zh]] of Object.entries(sessionErrors)) { words.en[code] = en; words['zh-CN'][code] = zh; }
   Object.assign(words.en, { session_sync_failed: 'Session synchronization failed', sharing_stopped: 'Session sharing stopped', ingest_http: 'Session upload HTTP status', ingest_auth: 'Refreshing upload authentication' });
   Object.assign(words['zh-CN'], { session_sync_failed: '会话同步失败', sharing_stopped: '会话共享已停止', ingest_http: '会话上传 HTTP 状态', ingest_auth: '正在刷新上传认证' });
+  const storageWords = {
+    savedTitle: ['Saved connection', '保存连接'],
+    savedHint: ['Address and ID are saved on Connect. Token encryption is optional; the password is never saved. Use a strong unique password. Upgrade in place; uninstall may remove plugin data.', '连接时保存地址和 ID；可选加密保存令牌，密码不保存。请使用独立强密码。请覆盖升级，卸载可能清除插件数据。'],
+    useSaved: ['Use saved encrypted token', '使用已保存的加密令牌'],
+    rememberConnection: ['Encrypt and remember the entered token', '加密并记住本次输入的令牌'],
+    vaultPassword: ['Encryption / unlock password (at least 12 characters)', '加密／解锁密码（至少 12 个字符）'],
+    forgetConsent: ['Disconnect and forget saved connection only; keep session mappings', '确认断开并忘记已保存连接，不清除会话映射'],
+    forgetConnection: ['Forget saved connection', '忘记已保存连接'],
+    savedEncrypted: ['Encrypted token saved. Enter your password and confirm connection/sharing again.', '已保存加密令牌。输入密码后重新确认连接和共享。'],
+    savedMetadata: ['Address and ID saved; enter the original token to connect.', '已保存地址和 ID；连接时仍需输入原令牌。'],
+    savedNone: ['No saved connection.', '尚无已保存连接。'],
+    forgotten: ['Saved connection cleared. Session mappings retained.', '已清除保存的连接，会话映射保留。'],
+    password_invalid: ['Use a password of 12–1024 characters.', '请使用 12～1024 个字符的密码。'],
+    unlock_failed: ['Unable to unlock. Check your password; the encrypted token may be damaged.', '解锁失败，请检查密码；加密令牌也可能已损坏。'],
+    saved_connection_invalid: ['Saved connection is invalid. Forget it locally before saving a replacement.', '保存的连接无效，请在本地忘记后重新保存。'],
+    saved_connection_mismatch: ['Saved token belongs to a different address or Connector ID.', '保存的令牌与当前地址或连接器 ID 不匹配。'],
+    saved_connection_missing: ['No encrypted token is saved.', '没有已保存的加密令牌。'],
+    persistence_unavailable: ['Host plugin storage is unavailable.', '宿主插件存储不可用。'],
+    persistence_failed: ['Unable to save connection. Check local plugin storage.', '无法保存连接，请检查本地插件存储。'],
+    persistence_busy: ['Wait for the current save or unlock operation.', '请等待当前保存或解锁操作完成。']
+  };
+  for (const [code, [en, zh]] of Object.entries(storageWords)) { words.en[code] = en; words['zh-CN'][code] = zh; }
   const states = new Set(['unconfigured', 'connecting', 'online', 'reconnecting', 'authentication_failed', 'protocol_incompatible', 'network_error', 'disconnected', 'ownership_conflict']);
   const errorCodes = new Set(['authentication_failed', 'protocol_incompatible', 'network_error', 'ownership_conflict', 'request_failed', 'bridge_unavailable', 'bridge_timeout', 'permission_denied', 'not_found', 'invalid_response', 'consent_required', 'invalid_config', 'invalid_command', 'insecure_origin', 'domain_not_allowed', 'profile_unavailable', 'unsupported', 'unavailable']);
   errorCodes.add('parser_unavailable');
   for (const code of Object.keys(sessionErrors)) errorCodes.add(code);
+  for (const code of ['password_invalid', 'unlock_failed', 'saved_connection_invalid', 'saved_connection_mismatch', 'saved_connection_missing', 'persistence_unavailable', 'persistence_failed', 'persistence_busy']) errorCodes.add(code);
   let locale = document.documentElement.lang === 'zh-CN' ? 'zh-CN' : 'en';
   let status = null;
   let firstStatus = true;
@@ -126,7 +149,7 @@
   let queue = Promise.resolve();
   const text = (key) => words[locale][key] || words[locale].unknown;
   const fail = (code) => Object.assign(new Error(code), { code });
-  const PANEL_VERSION = '2.0.0-beta.2';
+  const PANEL_VERSION = '2.0.0-beta.3';
   const localLogs = [];
   const events = new Set(['panel_ready', 'bridge_request', 'bridge_failure', 'status_received', 'panel_error', 'form_invalid', 'plugin_loaded', 'connect_received', 'configuration_rejected', 'protocol', 'auth_request', 'auth_http', 'websocket_connect', 'websocket_open', 'rpc', 'retry_scheduled', ...states]);
   events.add('command_parse'); events.add('command_parsed');
@@ -151,7 +174,7 @@
     const value = typeof entry?.detail === 'string' ? entry.detail : '';
     const fixed = new Set(['FRAME_LIMIT', 'INVALID_JSON', 'INVALID_RPC_FRAME', 'REQUEST_LIMIT', 'RPC_ID_REUSED', 'HOST_NETWORK_ERROR', 'HOST_API_OR_PERMISSION_UNAVAILABLE', 'INVALID_HTTP_RESPONSE', 'INVALID_AUTH_RESPONSE', 'INVALID_AUTH_JSON', 'INVALID_AUTH_FIELDS', 'INVALID_SOCKET_HANDLE', 'RUNTIME_DISCOVERY_TIMEOUT', 'EARLY_EVENT_LIMIT', 'VERSION_UNKNOWN', ...[...errorCodes].map(code => code.toUpperCase())]);
     const allowed = /^(?:\d{1,5}(?:ms)?|\d+\.\d+\.\d+(?:-(?:alpha|beta)\.\d+)?|WS_CLOSE_\d{1,4}|HTTP_\d{3}|(?:current|legacy):[a-f0-9]{40}|(?:runtime\.(?:discover|configSchema|config|validateConfig|start|stop|capabilities)|unsupported_method):(?:ok|invalid_params|runtime_conflict|runtime_not_found|runtime_not_running|method_not_found|internal_error)|(?:AUTH|WS_CONNECT|WS_EVENT|RPC_SEND|RPC|HEARTBEAT):(?:PERMISSION_DENIED|DOMAIN_NOT_ALLOWED|UNSUPPORTED|DNS_FAILURE|TLS_FAILURE|TIMEOUT|CONNECTION_REFUSED|CONNECTION_RESET|PROXY_FAILURE|HOST_NETWORK_ERROR|HTTP_\d{3}))$/;
-    const bridge = value.match(/^(app\.getAppearance|anywhere\.(?:status|parse|connect|disconnect))(?::([a-z_]+))?$/);
+    const bridge = value.match(/^(app\.getAppearance|anywhere\.(?:status|parse|connect|disconnect|forget))(?::([a-z_]+))?$/);
     const field = event === 'form_invalid' && ['serverUrl', 'connectorId', 'connectorToken'].includes(value);
     const endpoint = ['auth_request', 'websocket_connect'].includes(event) && /^(?:https?|wss?):\/\/[A-Za-z0-9.:[\]-]+\/(?:api\/v2\/)?connector\/(?:auth|ws)$/.test(value);
     const rpc = value.match(/^((?:session|runtime)\.[A-Za-z_.]+):([a-z_]+)$/);
@@ -194,6 +217,14 @@
     // Keep status polling from disrupting typing; freeze fields only during user actions.
     $('connect').disabled = busy || closed || !$('consent').checked || !status ||
       !$('profile').selectedOptions[0] || $('profile').selectedOptions[0].disabled;
+    const useSaved = $('useSaved').checked;
+    $('useSaved').disabled = busy || closed || status?.savedConnection?.encrypted !== true;
+    $('rememberConnection').disabled = busy || closed || useSaved;
+    $('connectorToken').required = !useSaved;
+    $('connectorToken').disabled = editingLocked || closed || useSaved;
+    $('vaultPassword').disabled = editingLocked || closed || (!useSaved && !$('rememberConnection').checked);
+    $('vaultPassword').required = useSaved || $('rememberConnection').checked;
+    $('forgetConnection').disabled = busy || closed || !$('forgetConsent').checked;
     $('connection').setAttribute('aria-busy', String(busy));
   }
 
@@ -222,6 +253,7 @@
       $(id).dataset.active = String(value === true);
     }
     if ($('runtimeSetup')) $('runtimeSetup').hidden = !(status?.state === 'online' && !status?.runtime?.running);
+    $('savedState').textContent = status?.savedConnectionError ? text(errorCodes.has(status.savedConnectionError) ? status.savedConnectionError : 'persistence_failed') : text(status?.savedConnection?.encrypted ? 'savedEncrypted' : status?.savedConnection ? 'savedMetadata' : 'savedNone');
     for (const option of $('profile').options) {
       const entry = status?.profiles?.find((item) => item?.id === option.value);
       option.disabled = !entry || entry.enabled !== true;
@@ -257,6 +289,7 @@
       if (typeof result.serverUrl === 'string' && !$('serverUrl').dataset.edited) $('serverUrl').value = result.serverUrl || 'https://web.agents-anywhere.com';
       if (typeof result.connectorId === 'string' && !$('connectorId').dataset.edited) $('connectorId').value = result.connectorId;
       if (['current', 'legacy'].includes(result.profile) && !$('profile').dataset.edited) $('profile').value = result.profile;
+      if (result.savedConnection?.encrypted === true && !['serverUrl', 'connectorId', 'profile', 'connectorToken'].some(id => $(id).dataset.edited)) $('useSaved').checked = true;
     }
     render();
   }
@@ -294,6 +327,7 @@
       $(id).dataset.edited = 'true';
       $('consent').checked = false;
       if ($('shareSessions')) $('shareSessions').checked = false;
+      $('useSaved').checked = false; $('rememberConnection').checked = false; $('vaultPassword').value = '';
       controls();
     });
   }
@@ -309,6 +343,7 @@
       }
       $('command').value = ''; $('consent').checked = false;
       if ($('shareSessions')) $('shareSessions').checked = false;
+      $('useSaved').checked = false; $('rememberConnection').checked = false; $('vaultPassword').value = '';
       message = 'parsed'; localLog('command_parsed');
     } catch (error) {
       message = safeCode(error); localLog('panel_error', message.toUpperCase());
@@ -321,11 +356,16 @@
     const args = {
       serverUrl: $('serverUrl').value.trim(), connectorId: $('connectorId').value.trim(),
       connectorToken: $('connectorToken').value, profile: $('profile').value, consent: true,
-      shareSessions: $('shareSessions')?.checked === true
+      shareSessions: $('shareSessions')?.checked === true,
+      useSaved: $('useSaved').checked, rememberConnection: $('rememberConnection').checked,
+      vaultPassword: $('vaultPassword').value
     };
+    $('vaultPassword').value = '';
     void action(async () => {
       message = '';
-      const result = await invoke('anywhere.connect', args);
+      let result;
+      try { result = await invoke('anywhere.connect', args); }
+      finally { args.vaultPassword = ''; args.connectorToken = ''; }
       if (result?.ok === false || result?.accepted === false) throw fail('request_failed');
       $('connectorToken').value = '';
       $('command').value = '';
@@ -333,6 +373,8 @@
       if ($('shareSessions')) $('shareSessions').checked = false;
       message = 'accepted';
       await refresh();
+      $('rememberConnection').checked = false;
+      $('useSaved').checked = !closed && status?.savedConnection?.encrypted === true;
     }, true);
   });
   $('disconnect').addEventListener('click', () => action(async () => {
@@ -341,6 +383,20 @@
     message = 'stopped';
     await refresh();
   }, true));
+  for (const id of ['useSaved', 'rememberConnection']) $(id).addEventListener('change', () => {
+    if ($(id).checked) $(id === 'useSaved' ? 'rememberConnection' : 'useSaved').checked = false;
+    $('consent').checked = false; $('shareSessions').checked = false; $('vaultPassword').value = ''; controls();
+  });
+  $('forgetConsent').addEventListener('change', controls);
+  $('forgetConnection').addEventListener('click', () => {
+    if (!$('forgetConsent').checked) return;
+    void action(async () => {
+      await invoke('anywhere.forget', { confirm: true });
+      for (const id of ['connectorId', 'connectorToken', 'command', 'vaultPassword']) $(id).value = '';
+      for (const id of ['useSaved', 'rememberConnection', 'forgetConsent', 'consent', 'shareSessions']) $(id).checked = false;
+      message = 'forgotten'; await refresh();
+    }, true);
+  });
   $('refresh').addEventListener('click', () => action(async () => { message = ''; await refresh(); }));
 
   const appearance = window.__appearance;
@@ -362,6 +418,7 @@
     clearInterval(timer);
     $('connectorToken').value = '';
     $('command').value = '';
+    $('vaultPassword').value = ''; $('useSaved').checked = false; $('rememberConnection').checked = false; $('forgetConsent').checked = false;
     $('consent').checked = false;
     if ($('shareSessions')) $('shareSessions').checked = false;
     controls();
