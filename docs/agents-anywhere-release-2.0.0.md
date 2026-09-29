@@ -105,3 +105,34 @@ must not be used as a no-op test. A market-side package/audit dry run can be use
 while repository binding or manual approval is blocked. Actual push, dry-run and
 publication outcomes are recorded in the final delivery report or a follow-up
 section; preparation alone is not a published release.
+
+## Final remote outcome
+
+Code/package commit `43ac8fb5ed461a577765f1cb492075774c4c4e22`
+(`feat(adoin.panel.anywhere): rename plugin and add persistent tabs`) was pushed
+successfully to `origin/feat/pi-agents-anywhere-v2`. `git ls-remote` confirmed the
+same SHA. Main remains `c35605a5ed31bd4c899683d5fd0064bd632775cb`.
+
+The user completed GitHub App authorization; a subsequent `list_repositories`
+confirmed `adoin/pi-desktop-plugins` is bindable. No other repository was used.
+The authenticated market-side `pack_plugin` dry run used the pushed commit as
+sourceRef and all 18 non-manifest source files plus complete original manifest
+fields. It reported **0 blockers, 1 REVIEW, readable=true, readyToPublish=true**.
+The REVIEW is `MAN013`: `net.websocket` requires host-policy review. That
+permission is necessary and was not removed to evade review.
+
+The marketplace reconstructs/repackages the manifest: its dry-run artifact is
+**155,275 bytes**, SHA-256
+`c989015c7edbc73daa18f83d1c2e5c82d93176790cd7e0f2e49788684cebb3b2`.
+Decoded only in memory for inspection, every non-manifest file matches source
+bytes and every manifest field matches the local manifest, with no added fields.
+It is a separate serialization from the locally verified PluginPack artifact;
+the local package/catalog hash above was not overwritten or misrepresented.
+
+No `create_plugin` or `submit_version` mutation was invoked: those can release a
+public version, while the repository's two independent maintainer approvals,
+host redirect verification and global release gate remain unmet. The marketplace
+technical readiness flag does not satisfy those policy requirements. No review
+finding was accepted automatically. **The plugin is not published to the market**;
+authentication, repository binding, pushed source and market preflight are ready
+for a maintainer-approved release. No duplicate or waiting version was submitted.
