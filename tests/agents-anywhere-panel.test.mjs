@@ -19,14 +19,15 @@ function fixture(override, options = {}) {
   const ids = ['connect', 'disconnect', 'parse', 'refresh', 'diagnostics', 'report', 'consent', 'connection', 'profile', 'message', 'logs', 'state', 'discovered', 'running', 'serverUrl', 'connectorId', 'connectorToken', 'command'];
   ids.push('shareSessions', 'runtimeId', 'sharingEnabled', 'sharingReady', 'workspaceName', 'sessionCount', 'lastSyncAt', 'runtimeSetup');
   ids.push('useSaved', 'rememberConnection', 'vaultPassword', 'savedState', 'forgetConsent', 'forgetConnection');
+  ids.push('useProjects', 'loadProjects', 'selectAllProjects', 'clearProjects', 'projectsList', 'projectsCount', 'projectsState');
   const tabs = ['status', 'connections', 'events'];
   ids.push(...tabs.flatMap(id => [`tab-${id}`, `panel-${id}`]));
   const nodes = Object.fromEntries(ids.map(id => [id, new Element()]));
   nodes.profile.value = 'current'; nodes.profile.options = [new Element('current'), new Element('legacy')];
   Object.defineProperty(nodes.profile, 'selectedOptions', { get: () => nodes.profile.options.filter(option => option.value === nodes.profile.value) });
-  const fields = ['consent', 'shareSessions', 'profile', 'serverUrl', 'connectorId', 'connectorToken', 'command', 'useSaved', 'rememberConnection', 'vaultPassword', 'forgetConsent'].map(id => nodes[id]);
+  const fields = ['useProjects', 'consent', 'shareSessions', 'profile', 'serverUrl', 'connectorId', 'connectorToken', 'command', 'useSaved', 'rememberConnection', 'vaultPassword', 'forgetConsent'].map(id => nodes[id]);
   nodes.connection.querySelectorAll = () => fields;
-  const buttons = ['connect', 'disconnect', 'parse', 'refresh', 'diagnostics', 'forgetConnection', ...tabs.map(id => `tab-${id}`)].map(id => nodes[id]);
+  const buttons = ['loadProjects', 'selectAllProjects', 'clearProjects', 'connect', 'disconnect', 'parse', 'refresh', 'diagnostics', 'forgetConnection', ...tabs.map(id => `tab-${id}`)].map(id => nodes[id]);
   for (const [index, id] of tabs.entries()) nodes[`tab-${id}`].dataset.i18n = ['tabStatus', 'tabConnections', 'tabEvents'][index];
   for (const id of ['connect', 'disconnect', 'parse', 'refresh']) nodes[id].dataset.i18n = id;
   nodes.runtimeSetup.dataset.i18n = 'runtimeSetup';
@@ -224,7 +225,7 @@ test('sharing status and runtime instance are bounded, distinct and excluded fro
   const f = fixture(); await flush(); const n = f.nodes;
   assert.equal(n.sharingReady.textContent, 'Unknown'); assert.equal(n.runtimeSetup.hidden, true);
   const privatePath = 'C:\\private\\workspace';
-  f.status.pluginVersion = '2.1.0';
+  f.status.pluginVersion = '2.2.0';
   f.status.state = 'online'; f.status.runtime = { discovered: true, running: false, runtimeId: 'instance-'.repeat(40) };
   f.status.sharing = { enabled: true, ready: false, workspaceName: '<workspace>'.repeat(40), workspacePath: privatePath, sessionCount: 3, lastSyncAt: '2026-01-01T00:00:00.000Z' };
   f.intervals.get(1)(); await flush();
@@ -235,7 +236,7 @@ test('sharing status and runtime instance are bounded, distinct and excluded fro
   assert.match(n.runtimeSetup.textContent, /save its empty config, then enable it/);
   f.callbacks.get('locale')('zh-CN'); assert.match(n.runtimeSetup.textContent, /保存其空配置/);
   f.callbacks.get('locale')('en'); n.diagnostics.emit('click');
-  assert.match(n.report.value, /Panel: 2\.1\.0\n/); assert.match(n.report.value, /Plugin: 2\.1\.0\n/);
+  assert.match(n.report.value, /Panel: 2\.2\.0\n/); assert.match(n.report.value, /Plugin: 2\.2\.0\n/);
   for (const privateValue of [privatePath, '<workspace>', 'instance-']) assert.ok(!n.report.value.includes(privateValue));
   f.status.runtime.running = true; f.status.sharing = { enabled: false, ready: true, workspaceName: 'not approved', sessionCount: -1, lastSyncAt: privatePath };
   f.intervals.get(1)(); await flush();
@@ -325,7 +326,7 @@ test('horizontal tabs support wrapped arrows, Home and End with roving focus dur
   assert.equal(f.nodes['tab-connections'].emit('keydown', { key: 'Tab' }).defaultPrevented, undefined);
   assert.equal(f.nodes['tab-connections'].emit('keydown', { key: 'Home', ctrlKey: true }).defaultPrevented, undefined);
   assertTab(f, 'connections');
-  f.nodes['tab-events'].emit('click'); f.nodes.diagnostics.emit('click'); assert.match(f.nodes.report.value, /Panel: 2\.1\.0/);
+  f.nodes['tab-events'].emit('click'); f.nodes.diagnostics.emit('click'); assert.match(f.nodes.report.value, /Panel: 2\.2\.0/);
   f.callbacks.get('locale')('zh-CN'); assertTab(f, 'events');
   assert.deepEqual(['status', 'connections', 'events'].map(id => f.nodes[`tab-${id}`].textContent), ['状态', '连接管理', '事件']);
   f.callbacks.get('pagehide')(); f.nodes['tab-status'].emit('click'); assertTab(f, 'events');
@@ -359,5 +360,120 @@ test('self-hosted origin editing revokes consent and redirect diagnostics remain
   f.intervals.get(1)(); await flush(); n.diagnostics.emit('click');
   assert.match(n.report.value, /AUTH:REDIRECT_DISALLOWED/); assert.match(n.report.value, /INGEST:REDIRECT_POLICY_UNAVAILABLE/);
   assert.ok(!n.report.value.includes('private header contents'));
+  f.callbacks.get('pagehide')();
+});
+
+const projectInventory = (count = 3) => ({
+  projects: Array.from({ length: count }, (_, i) => ({ id: `project-${i}`, name: `<Private project ${i}>`, path: `C:/private/project-${i}` })),
+  selectedProjectIds: ['project-1', 'removed-id'], useProjects: true
+});
+const projectBoxes = n => n.projectsList.children.map(label => label.children[0]);
+test('projects load only explicitly, restore known IDs without consent, and never persist project data in browser storage', async () => {
+  const inventory = projectInventory();
+  const f = fixture(method => method === 'anywhere.projects' ? inventory : undefined); await flush(); const n = f.nodes;
+  assert.equal(n.useProjects.checked, false); assert.ok(f.calls.every(c => c.method === 'anywhere.status'));
+  n.consent.checked = true; n.shareSessions.checked = true; n.loadProjects.emit('click'); await flush();
+  assert.equal(n.useProjects.checked, true); assert.deepEqual(projectBoxes(n).map(b => b.checked), [false, true, false]);
+  assert.equal(n.consent.checked, false); assert.equal(n.shareSessions.checked, false);
+  assert.match(n.projectsCount.textContent, /^1 \/ 3/);
+  assert.deepEqual(Object.keys(f.calls.find(c => c.method === 'anywhere.projects').args).sort(), ['connectorId', 'profile', 'serverUrl']);
+  assert.equal(n.projectsList.children[0].children[1].children[0].textContent, inventory.projects[0].name);
+  assert.equal(n.projectsList.children[0].children[1].children[0].children.length, 0);
+  n.diagnostics.emit('click'); assert.match(n.report.value, /bridge_request: anywhere.projects/);
+  for (const p of inventory.projects) { assert.ok(!n.report.value.includes(p.name)); assert.ok(!n.report.value.includes(p.path)); }
+  assert.deepEqual(f.writes, []);
+  f.callbacks.get('pagehide')(); assert.equal(n.projectsList.children.length, 0); assert.equal(n.useProjects.checked, false);
+});
+test('bulk and individual project scope edits reset both grants; connect sends IDs only for project mode', async () => {
+  const f = fixture(method => method === 'anywhere.projects' ? projectInventory() : undefined); await flush(); const n = f.nodes;
+  n.loadProjects.emit('click'); await flush();
+  n.consent.checked = true; n.shareSessions.checked = true; n.selectAllProjects.emit('click');
+  assert.ok(projectBoxes(n).every(b => b.checked)); assert.equal(n.consent.checked, false); assert.equal(n.shareSessions.checked, false);
+  n.consent.checked = true; n.connection.emit('submit'); await flush();
+  let args = f.calls.filter(c => c.method === 'anywhere.connect').at(-1).args;
+  assert.equal(args.useProjects, true); assert.equal(args.shareSessions, false); assert.deepEqual(Array.from(args.projectIds), ['project-0', 'project-1', 'project-2']);
+  n.consent.checked = true; n.shareSessions.checked = true;
+  const box = projectBoxes(n)[0]; box.checked = false; box.emit('change');
+  assert.equal(n.consent.checked, false); assert.equal(n.shareSessions.checked, false);
+  n.useProjects.checked = false; n.useProjects.emit('change'); n.consent.checked = true; n.connection.emit('submit'); await flush();
+  args = f.calls.filter(c => c.method === 'anywhere.connect').at(-1).args;
+  assert.equal(args.useProjects, false); assert.equal(args.projectIds.length, 0);
+  n.consent.checked = true; n.shareSessions.checked = true; n.clearProjects.emit('click');
+  assert.equal(n.consent.checked, false); assert.equal(n.shareSessions.checked, false); assert.ok(projectBoxes(n).every(b => !b.checked));
+  n.useProjects.checked = true; n.useProjects.emit('change'); n.consent.checked = true;
+  const before = f.calls.length; n.connection.emit('submit'); await flush();
+  assert.equal(f.calls.length, before); assert.match(n.message.textContent, /project_selection_invalid/);
+  f.callbacks.get('pagehide')();
+});
+test('identity edits and parser invalidate inventory, while token typing preserves project scope', async () => {
+  const f = fixture(method => method === 'anywhere.projects' ? projectInventory() : undefined); await flush(); const n = f.nodes;
+  for (const id of ['serverUrl', 'connectorId', 'profile', 'command']) {
+    n.loadProjects.emit('click'); await flush(); n.consent.checked = true; n.shareSessions.checked = true; n[id].emit('input');
+    assert.equal(n.useProjects.checked, false, id); assert.equal(n.projectsList.children.length, 0, id);
+    assert.equal(n.consent.checked, false); assert.equal(n.shareSessions.checked, false);
+  }
+  n.loadProjects.emit('click'); await flush(); n.connectorToken.emit('input');
+  assert.equal(n.useProjects.checked, true); assert.equal(projectBoxes(n)[1].checked, true);
+  n.parse.emit('click'); assert.equal(n.useProjects.checked, false); assert.equal(n.projectsList.children.length, 0);
+  f.callbacks.get('pagehide')();
+});
+test('project selection caps at 32, inventory caps at 200, and empty inventories are visible', async () => {
+  let inventory = projectInventory(33); inventory.selectedProjectIds = [];
+  const f = fixture(method => method === 'anywhere.projects' ? inventory : undefined); await flush(); const n = f.nodes;
+  n.loadProjects.emit('click'); await flush(); n.selectAllProjects.emit('click');
+  assert.match(n.message.textContent, /project_selection_invalid/); assert.ok(projectBoxes(n).every(b => !b.checked));
+  for (const box of projectBoxes(n)) { box.checked = true; box.emit('change'); }
+  assert.equal(projectBoxes(n).filter(b => b.checked).length, 32); assert.match(n.projectsCount.textContent, /^32 \/ 33/);
+  inventory = projectInventory(201); n.loadProjects.emit('click'); await flush();
+  assert.equal(n.projectsList.children.length, 0); assert.match(n.message.textContent, /projects_unavailable/);
+  inventory = { projects: [], selectedProjectIds: [], useProjects: false }; n.loadProjects.emit('click'); await flush();
+  assert.match(n.projectsState.textContent, /No saved projects/); assert.equal(n.selectAllProjects.disabled, true);
+  f.callbacks.get('pagehide')();
+});
+test('project errors are bilingual fixed codes and late inventory cannot restore after pagehide', async () => {
+  for (const code of ['project_selection_invalid', 'project_selection_changed', 'projects_unavailable']) {
+    const f = fixture(method => { if (method === 'anywhere.projects') throw Object.assign(new Error('private path'), { code }); }); await flush();
+    f.nodes.loadProjects.emit('click'); await flush(); assert.ok(f.nodes.message.textContent.includes(code));
+    f.callbacks.get('locale')('zh-CN'); assert.match(f.nodes.message.textContent, /项目/);
+    f.nodes.diagnostics.emit('click'); assert.ok(f.nodes.report.value.includes(`anywhere.projects:${code}`)); assert.ok(!f.nodes.report.value.includes('private path'));
+    f.callbacks.get('pagehide')();
+  }
+  let resolve;
+  const f = fixture(method => method === 'anywhere.projects' ? new Promise(done => { resolve = done; }) : undefined); await flush();
+  f.nodes.loadProjects.emit('click'); await flush(); assert.match(f.nodes.projectsState.textContent, /Loading/);
+  f.callbacks.get('pagehide')(); resolve(projectInventory()); await flush();
+  assert.equal(f.nodes.projectsList.children.length, 0); assert.equal(f.nodes.useProjects.checked, false);
+});
+
+test('reloading never selects newly saved projects and explicit sharing reaches connect without names or paths', async () => {
+  let inventory = projectInventory(2);
+  const f = fixture(method => method === 'anywhere.projects' ? inventory : undefined); await flush(); const n = f.nodes;
+  n.loadProjects.emit('click'); await flush();
+  inventory = projectInventory(3); n.loadProjects.emit('click'); await flush();
+  assert.deepEqual(projectBoxes(n).map(box => box.checked), [false, true, false]);
+  assert.equal(n.consent.checked, false); assert.equal(n.shareSessions.checked, false);
+  n.selectAllProjects.emit('click'); n.shareSessions.checked = true; n.consent.checked = true;
+  n.connection.emit('submit'); await flush();
+  const args = f.calls.find(call => call.method === 'anywhere.connect').args;
+  assert.equal(args.shareSessions, true); assert.equal(args.useProjects, true);
+  assert.deepEqual(Array.from(args.projectIds), ['project-0', 'project-1', 'project-2']);
+  for (const p of inventory.projects) { assert.ok(!JSON.stringify(args).includes(p.name)); assert.ok(!JSON.stringify(args).includes(p.path)); }
+  assert.equal(f.calls.filter(call => call.method === 'anywhere.connect').length, 1);
+  f.callbacks.get('pagehide')();
+  const html = readFileSync(new URL('../plugins/adoin.panel.anywhere/renderer/index.html', import.meta.url), 'utf8');
+  assert.match(html, /class="badge">2\.2\.0</);
+});
+
+test('reopened saved connection restores project choices locally without granting sharing', async () => {
+  const f = fixture(method => {
+    if (method === 'anywhere.status') return { state:'unconfigured', serverUrl:'https://selfhost.example', connectorId:'conn_restore', profile:'current', savedConnection:{encrypted:true}, profiles:[{id:'current',enabled:true}], logs:[] };
+    if (method === 'anywhere.projects') return { projects:[{id:'1',name:'Selected',path:'C:/selected'},{id:'2',name:'New',path:'C:/new'}],selectedProjectIds:['1'],useProjects:true };
+  });
+  await flush();
+  assert.equal(f.nodes.useProjects.checked,true);
+  assert.equal(f.nodes.projectsList.children[0].children[0].checked,true);
+  assert.equal(f.nodes.projectsList.children[1].children[0].checked,false);
+  assert.equal(f.nodes.consent.checked,false); assert.equal(f.nodes.shareSessions.checked,false);
+  assert.ok(f.calls.every(c=>['anywhere.status','anywhere.projects'].includes(c.method)));
   f.callbacks.get('pagehide')();
 });

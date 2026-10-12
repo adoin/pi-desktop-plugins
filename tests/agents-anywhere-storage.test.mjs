@@ -115,12 +115,12 @@ test('mapping, receipt and scope limits preserve existing entries', async () => 
   seed(f, s, { bindings: [], receipts: Array.from({ length: 1000 }, (_, i) => ({ key: `request-${i}`, digest: 'digest', status: 'done', result: i })) });
   await rejects(s.receipt('overflow', 'digest'), 'mapping_limit');
   assert.deepEqual(await s.receipt('request-0', 'digest'), { duplicate: true, result: 0 });
-  f.settings = { [KEY]: { version: 1, scopes: Object.fromEntries(Array.from({ length: 16 }, (_, i) => [`scope-${i}`, empty()])) } };
+  f.settings = { [KEY]: { version: 1, scopes: Object.fromEntries(Array.from({ length: 64 }, (_, i) => [`scope-${i}`, empty()])) } };
   await rejects(s.bind('runtime', 'remote', 'native'), 'mapping_limit');
   delete f.settings[KEY].scopes['scope-0'];
   await s.bind('runtime', 'remote', 'native');
   await s.bind('runtime', 'second', 'native-second');
-  assert.equal(Object.keys(f.settings[KEY].scopes).length, 16);
+  assert.equal(Object.keys(f.settings[KEY].scopes).length, 64);
 });
 
 test('failed persistence leaves memory unchanged and does not poison the shared queue', async () => {

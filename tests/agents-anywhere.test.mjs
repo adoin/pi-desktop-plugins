@@ -34,7 +34,7 @@ function fixture(overrides = {}) {
 }
 
 test('manifest pins renamed stable version, exact permissions and bilingual install disclosures', () => {
-  assert.equal(manifest.id, 'adoin.panel.anywhere'); assert.equal(manifest.version, '2.1.0');
+  assert.equal(manifest.id, 'adoin.panel.anywhere'); assert.equal(manifest.version, '2.2.0');
   assert.equal(manifest.engines.piDesktop, '>=0.18.0');
   assert.ok(!/beta/i.test(manifest.name));
   assert.deepEqual(manifest.activationEvents, ['onStartup', 'onCommand:adoin.panel.anywhere.open']);

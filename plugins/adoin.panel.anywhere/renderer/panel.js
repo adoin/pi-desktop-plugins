@@ -138,12 +138,31 @@
     persistence_busy: ['Wait for the current save or unlock operation.', '请等待当前保存或解锁操作完成。']
   };
   for (const [code, [en, zh]] of Object.entries(storageWords)) { words.en[code] = en; words['zh-CN'][code] = zh; }
+  const projectWords = {
+    projectsTitle: ['Saved project sharing', '已保存项目共享'],
+    useProjects: ['Share selected saved projects instead of current workspace', '共享选中的已保存项目，而非当前工作区'],
+    loadProjects: ['Load saved projects', '加载已保存项目'],
+    selectAllProjects: ['Select all', '全选'], clearProjects: ['Clear selection', '清空选择'],
+    projectsHelp: ['Load local saved projects, then select up to 32. On Connect, with sharing consent, paths, titles and conversation text are uploaded. Empty projects appear remotely only after a real session exists. New projects are not automatically selected. Changes apply only on reconnect; Disconnect to revoke immediately.', '加载本地已保存项目，最多选择 32 个。连接并确认共享后会上传路径、标题和对话文字。空项目仅在存在真实会话后才会显示在远端。新项目不会自动选中。更改仅在重新连接后生效；要立即撤销，请断开连接。'],
+    projectsIdle: ['Load projects to review or restore your saved selection. Loading sends no network request and grants no consent.', '加载项目以查看或恢复已保存选择。加载不发送网络请求，也不代表授权。'],
+    projectsLoading: ['Loading local saved projects…', '正在加载本地已保存项目…'],
+    projectsLoaded: ['Local projects loaded. Review the selection and confirm sharing separately.', '已加载本地项目。请检查选择，并另行确认共享。'],
+    projectsEmpty: ['No saved projects available.', '没有可用的已保存项目。'],
+    projectsSelected: ['selected (maximum 32)', '个已选（最多 32 个）'],
+    project_selection_invalid: ['Select 1–32 available projects. Select all requires no more than 32 projects.', '请选择 1～32 个可用项目。全选仅适用于不超过 32 个项目。'],
+    project_selection_changed: ['Project selection changed or moved. Reload projects and confirm sharing again.', '项目选择已改变或路径已移动。请重新加载项目并确认共享。'],
+    projects_unavailable: ['Saved projects are unavailable. Reload projects to try again.', '已保存项目不可用。请重新加载项目重试。']
+  };
+  for (const [code, [en, zh]] of Object.entries(projectWords)) { words.en[code] = en; words['zh-CN'][code] = zh; }
+  words.en.shareSessions = words.en.shareSessions.replace('current-workspace', 'selected-project or current-workspace');
+  words['zh-CN'].shareSessions = words['zh-CN'].shareSessions.replace('当前工作区路径', '所选项目或当前工作区的路径');
   const states = new Set(['unconfigured', 'connecting', 'online', 'reconnecting', 'authentication_failed', 'protocol_incompatible', 'network_error', 'disconnected', 'ownership_conflict']);
   const errorCodes = new Set(['authentication_failed', 'protocol_incompatible', 'network_error', 'ownership_conflict', 'request_failed', 'bridge_unavailable', 'bridge_timeout', 'permission_denied', 'not_found', 'invalid_response', 'consent_required', 'invalid_config', 'invalid_command', 'insecure_origin', 'domain_not_allowed', 'profile_unavailable', 'unsupported', 'unavailable']);
   errorCodes.add('redirect_policy_unavailable'); errorCodes.add('redirect_disallowed');
   errorCodes.add('parser_unavailable');
   for (const code of Object.keys(sessionErrors)) errorCodes.add(code);
   for (const code of ['password_invalid', 'unlock_failed', 'saved_connection_invalid', 'saved_connection_mismatch', 'saved_connection_missing', 'persistence_unavailable', 'persistence_failed', 'persistence_busy']) errorCodes.add(code);
+  for (const code of ['project_selection_invalid', 'project_selection_changed', 'projects_unavailable']) errorCodes.add(code);
   let locale = document.documentElement.lang === 'zh-CN' ? 'zh-CN' : 'en';
   let status = null;
   let firstStatus = true;
@@ -154,7 +173,10 @@
   let queue = Promise.resolve();
   const text = (key) => words[locale][key] || words[locale].unknown;
   const fail = (code) => Object.assign(new Error(code), { code });
-  const PANEL_VERSION = '2.1.0';
+  const PANEL_VERSION = '2.2.0';
+  let projects = [], projectInputs = [];
+  let selectedProjectIds = new Set();
+  let projectsState = 'projectsIdle';
   // Only these fixed navigation IDs may enter browser storage, never form data.
   const TAB_IDS = ['status', 'connections', 'events'];
   const TAB_STORAGE_KEY = 'adoin.panel.anywhere.activeTab.v1';
@@ -217,7 +239,7 @@
     const value = typeof entry?.detail === 'string' ? entry.detail : '';
     const fixed = new Set(['FRAME_LIMIT', 'INVALID_JSON', 'INVALID_RPC_FRAME', 'REQUEST_LIMIT', 'RPC_ID_REUSED', 'HOST_NETWORK_ERROR', 'HOST_API_OR_PERMISSION_UNAVAILABLE', 'INVALID_HTTP_RESPONSE', 'INVALID_AUTH_RESPONSE', 'INVALID_AUTH_JSON', 'INVALID_AUTH_FIELDS', 'INVALID_SOCKET_HANDLE', 'RUNTIME_DISCOVERY_TIMEOUT', 'EARLY_EVENT_LIMIT', 'VERSION_UNKNOWN', ...[...errorCodes].map(code => code.toUpperCase())]);
     const allowed = /^(?:\d{1,5}(?:ms)?|\d+\.\d+\.\d+(?:-(?:alpha|beta)\.\d+)?|WS_CLOSE_\d{1,4}|HTTP_\d{3}|(?:current|legacy):[a-f0-9]{40}|(?:runtime\.(?:discover|configSchema|config|validateConfig|start|stop|capabilities)|unsupported_method):(?:ok|invalid_params|runtime_conflict|runtime_not_found|runtime_not_running|method_not_found|internal_error)|(?:AUTH|INGEST|WS_CONNECT|WS_EVENT|RPC_SEND|RPC|HEARTBEAT):(?:REDIRECT_DISALLOWED|REDIRECT_POLICY_UNAVAILABLE|PERMISSION_DENIED|DOMAIN_NOT_ALLOWED|UNSUPPORTED|DNS_FAILURE|TLS_FAILURE|TIMEOUT|CONNECTION_REFUSED|CONNECTION_RESET|PROXY_FAILURE|HOST_NETWORK_ERROR|HTTP_\d{3}))$/;
-    const bridge = value.match(/^(app\.getAppearance|anywhere\.(?:status|parse|connect|disconnect|forget))(?::([a-z_]+))?$/);
+    const bridge = value.match(/^(app\.getAppearance|anywhere\.(?:status|parse|connect|disconnect|forget|projects))(?::([a-z_]+))?$/);
     const field = event === 'form_invalid' && ['serverUrl', 'connectorId', 'connectorToken'].includes(value);
     const endpoint = ['auth_request', 'websocket_connect'].includes(event) && /^(?:https?|wss?):\/\/[A-Za-z0-9.:[\]-]+\/(?:api\/v2\/)?connector\/(?:auth|ws)$/.test(value);
     const rpc = value.match(/^((?:session|runtime)\.[A-Za-z_.]+):([a-z_]+)$/);
@@ -270,6 +292,12 @@
     $('vaultPassword').disabled = editingLocked || closed || (!useSaved && !$('rememberConnection').checked);
     $('vaultPassword').required = useSaved || $('rememberConnection').checked;
     $('forgetConnection').disabled = busy || closed || !$('forgetConsent').checked;
+    $('useProjects').disabled = editingLocked || closed;
+    $('selectAllProjects').disabled = busy || closed || !projects.length;
+    $('clearProjects').disabled = busy || closed || !selectedProjectIds.size;
+    projectInputs.forEach(input => { input.disabled = editingLocked || closed; });
+    $('projectsState').textContent = text(projectsState);
+    $('projectsCount').textContent = `${selectedProjectIds.size} / ${projects.length} ${text('projectsSelected')}`;
     $('connection').setAttribute('aria-busy', String(busy));
   }
 
@@ -335,6 +363,7 @@
       if (typeof result.connectorId === 'string' && !$('connectorId').dataset.edited) $('connectorId').value = result.connectorId;
       if (['current', 'legacy'].includes(result.profile) && !$('profile').dataset.edited) $('profile').value = result.profile;
       if (result.savedConnection?.encrypted === true && !['serverUrl', 'connectorId', 'profile', 'connectorToken'].some(id => $(id).dataset.edited)) $('useSaved').checked = true;
+      if (result.savedConnection && $('connectorId').value.trim() && !['serverUrl', 'connectorId', 'profile'].some(id => $(id).dataset.edited)) await loadProjectInventory();
     }
     render();
   }
@@ -359,6 +388,71 @@
     }
   }
 
+  function resetSharing() {
+    $('consent').checked = false; $('shareSessions').checked = false;
+  }
+  function invalidateProjects() {
+    projects = []; projectInputs = []; selectedProjectIds.clear();
+    $('useProjects').checked = false; $('projectsList').replaceChildren();
+    projectsState = 'projectsIdle'; resetSharing();
+  }
+  function drawProjects() {
+    $('projectsList').replaceChildren(); projectInputs = [];
+    projects.forEach(project => {
+      const label = document.createElement('label'); label.className = 'project-option';
+      const input = document.createElement('input'); input.type = 'checkbox'; input.checked = selectedProjectIds.has(project.id);
+      const detail = document.createElement('span');
+      const name = document.createElement('strong'); name.textContent = project.name;
+      const path = document.createElement('span'); path.textContent = project.path;
+      detail.appendChild(name); detail.appendChild(path); label.appendChild(input); label.appendChild(detail);
+      input.addEventListener('change', () => {
+        if (closed || editingLocked) return;
+        resetSharing(); message = '';
+        if (input.checked && selectedProjectIds.size >= 32) { input.checked = false; message = 'project_selection_invalid'; }
+        else if (input.checked) selectedProjectIds.add(project.id);
+        else selectedProjectIds.delete(project.id);
+        render();
+      });
+      projectInputs.push(input); $('projectsList').appendChild(label);
+    });
+  }
+  $('useProjects').addEventListener('change', () => { resetSharing(); controls(); });
+  $('selectAllProjects').addEventListener('click', () => {
+    if (busy || closed) return;
+    resetSharing(); message = '';
+    if (projects.length > 32) message = 'project_selection_invalid';
+    else selectedProjectIds = new Set(projects.map(project => project.id));
+    drawProjects(); render();
+  });
+  $('clearProjects').addEventListener('click', () => {
+    if (busy || closed) return;
+    resetSharing(); selectedProjectIds.clear(); message = ''; drawProjects(); render();
+  });
+  async function loadProjectInventory() {
+    invalidateProjects(); projectsState = 'projectsLoading'; message = ''; render();
+    const identity = JSON.stringify([$('profile').value, $('serverUrl').value.trim(), $('connectorId').value.trim()]);
+    try {
+      const result = await invoke('anywhere.projects', {
+        profile: $('profile').value, serverUrl: $('serverUrl').value.trim(), connectorId: $('connectorId').value.trim()
+      });
+      if (closed || identity !== JSON.stringify([$('profile').value, $('serverUrl').value.trim(), $('connectorId').value.trim()])) return;
+      if (!result || !Array.isArray(result.projects) || result.projects.length > 200 ||
+          !Array.isArray(result.selectedProjectIds) || result.selectedProjectIds.length > 32 ||
+          typeof result.useProjects !== 'boolean' || result.selectedProjectIds.some(id => typeof id !== 'string') ||
+          result.projects.some(p => !p || ['id', 'name', 'path'].some(key => typeof p[key] !== 'string' || !p[key] || p[key].length > 8192)) ||
+          new Set(result.projects.map(p => p.id)).size !== result.projects.length) throw fail('projects_unavailable');
+      projects = result.projects.map(({ id, name, path }) => ({ id, name, path }));
+      // The host restores IDs only when their saved paths still match the inventory.
+      selectedProjectIds = new Set(result.selectedProjectIds.filter(id => projects.some(project => project.id === id)));
+      $('useProjects').checked = result.useProjects;
+      projectsState = projects.length ? 'projectsLoaded' : 'projectsEmpty';
+      drawProjects(); resetSharing();
+    } catch (error) {
+      if (!closed) { invalidateProjects(); projectsState = 'projects_unavailable'; }
+      throw error;
+    }
+  }
+  $('loadProjects').addEventListener('click', () => action(loadProjectInventory, true));
   $('consent').addEventListener('change', controls);
   $('connection').addEventListener('invalid', event => {
     const field = event.target?.id;
@@ -370,6 +464,7 @@
   for (const id of ['serverUrl', 'connectorId', 'connectorToken', 'profile', 'command']) {
     $(id).addEventListener('input', () => {
       $(id).dataset.edited = 'true';
+      if (id !== 'connectorToken') invalidateProjects();
       $('consent').checked = false;
       if ($('shareSessions')) $('shareSessions').checked = false;
       $('useSaved').checked = false; $('rememberConnection').checked = false; $('vaultPassword').value = '';
@@ -378,6 +473,7 @@
   }
   $('parse').addEventListener('click', () => {
     if (closed || editingLocked) return;
+    invalidateProjects();
     message = '';
     localLog('command_parse');
     try {
@@ -398,10 +494,15 @@
   $('connection').addEventListener('submit', (event) => {
     event.preventDefault();
     if (!$('consent').checked || $('profile').selectedOptions[0]?.disabled) return;
+    if ($('useProjects').checked && (!selectedProjectIds.size || selectedProjectIds.size > 32)) {
+      resetSharing(); message = 'project_selection_invalid'; render(); return;
+    }
     const args = {
       serverUrl: $('serverUrl').value.trim(), connectorId: $('connectorId').value.trim(),
       connectorToken: $('connectorToken').value, profile: $('profile').value, consent: true,
       shareSessions: $('shareSessions')?.checked === true,
+      useProjects: $('useProjects').checked,
+      projectIds: $('useProjects').checked ? [...selectedProjectIds] : [],
       useSaved: $('useSaved').checked, rememberConnection: $('rememberConnection').checked,
       vaultPassword: $('vaultPassword').value
     };
@@ -439,6 +540,7 @@
       await invoke('anywhere.forget', { confirm: true });
       for (const id of ['connectorId', 'connectorToken', 'command', 'vaultPassword']) $(id).value = '';
       for (const id of ['useSaved', 'rememberConnection', 'forgetConsent', 'consent', 'shareSessions']) $(id).checked = false;
+      invalidateProjects();
       message = 'forgotten'; await refresh();
     }, true);
   });
@@ -466,6 +568,7 @@
     $('vaultPassword').value = ''; $('useSaved').checked = false; $('rememberConnection').checked = false; $('forgetConsent').checked = false;
     $('consent').checked = false;
     if ($('shareSessions')) $('shareSessions').checked = false;
+    invalidateProjects();
     controls();
   }, { once: true });
 })();

@@ -2,24 +2,24 @@
   "schemaVersion": 1,
   "id": "adoin.panel.anywhere",
   "name": "Agents Anywhere",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Connect workspace chat to official or self-hosted Agents Anywhere with explicit consent, encrypted credentials and host-enforced redirect refusal.",
   "i18n": {
     "en": {
       "name": "Agents Anywhere",
-      "description": "Connect Pi workspace sessions to official or self-hosted Agents Anywhere. Discover, create, send, synchronize text replies and interrupt tasks.",
-      "safetyNotes": "High risk: net.anyHost is an install-time grant for arbitrary server hosts, not a per-domain prompt. Only connect to a trusted origin you confirm locally. Credentials and, with separate sharing consent, workspace paths, titles, conversation text, model IDs and status go to that server; remote prompts use existing local session permissions. Requires PI-Desktop 0.18.0+ and redirect:error capability; authentication and ingest never follow redirects. Remote HTTP and insecure TLS bypasses are not supported. Optional token storage is password-encrypted; passwords are not saved. Disconnect does not abort accepted turns. Human release review and deployed-server acceptance are still required."
+      "description": "Batch-share selected Pi projects and conversations with official or self-hosted Agents Anywhere. Discover, create, send, sync replies and interrupt tasks.",
+      "safetyNotes": "High risk: optional batch sharing exports selected projects' paths, session titles, user/assistant text, model IDs and status to your confirmed server, and allows remote prompts under each session's existing permissions. Project selections are saved per server/Connector; new projects are never selected automatically. Batch mode continues across active-workspace switches; removed or moved projects are refused. Changes apply on reconnect; disconnect to stop sharing immediately, without aborting accepted turns. Empty projects appear remotely only after a real session exists. net.anyHost grants arbitrary hosts at install; HTTP requests refuse redirects on PI-Desktop 0.18.0+. Credentials can be password-encrypted; passwords are not saved."
     },
     "zh-CN": {
       "name": "Agents Anywhere 远程连接",
-      "description": "将 Pi 工作区会话接入官方或自部署 Agents Anywhere，支持发现、新建、发送、同步文字回复和中断任务。",
-      "safetyNotes": "高风险：net.anyHost 在安装时授权任意服务器主机访问，不会逐域名弹窗。仅连接您在本地确认的可信源地址。凭据以及另行授权共享的工作区路径、标题、对话文字、模型标识和状态将发往该服务器；远程消息按会话现有权限执行。要求 PI-Desktop 0.18.0+ 及禁止重定向能力，认证和上传均不跟随跳转。不支持远程明文 HTTP 或跳过 TLS 验证。可选密码加密保存令牌，密码不保存。断开不终止已接收任务。仍需人工发布审查及部署环境验收。"
+      "description": "批量共享选中的 Pi 项目及会话至官方或自部署 Agents Anywhere，支持发现、新建、发送、同步回复和中断任务。",
+      "safetyNotes": "高风险：可选批量共享会将选中项目的路径、会话标题、用户及助手文字、模型标识和状态发往您确认的服务器，并允许按会话现有权限远程发消息。项目选择按服务器及连接器保存，新项目不会自动勾选。批量模式不因切换当前工作区而停止，但拒绝已删除或移动的项目。修改选择在重连后生效；立即停止请断开，断开不终止已接收任务。空项目需产生真实会话后才会在远端出现。net.anyHost 为安装时任意主机授权；要求 PI-Desktop 0.18.0+，HTTP 请求拒绝重定向。可用密码加密保存令牌，密码不保存。"
     }
   },
   "author": "PI-Desktop Plugin Contributors",
   "main": "main.js",
   "categories": ["productivity"],
-  "changelog": "2.1.0: support user-confirmed self-hosted HTTPS origins through the official net.anyHost permission. Require PI-Desktop 0.18.0+ redirect capability before networking; refuse redirects for authentication, token refresh and session ingest, with terminal sanitized diagnostics. Preserve origin-bound encrypted credentials, scoped session mappings and tab preferences.",
+  "changelog": "2.2.0: add local project inventory, batch selection/select-all and per-server remembered project choices. Share approved projects through isolated native bridges and session stores; automatically associate projects through real session metadata. Reject removed/moved/unselected project access, retain current-workspace mode, and do not invent sessions for empty projects. Permissions unchanged.",
   "permissions": ["ui.panel", "ui.view", "net.fetch", "net.websocket", "background.service", "desktop.control", "models.list", "net.anyHost"],
   "net": { "domains": ["web.agents-anywhere.com"] },
   "engines": { "piDesktop": ">=0.18.0" },

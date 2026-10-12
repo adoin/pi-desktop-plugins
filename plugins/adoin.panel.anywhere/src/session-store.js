@@ -25,9 +25,9 @@ class SessionStore {
       this.data = structuredClone(saved);
     } else this.data = { bindings: [], receipts: [] };
   }
-  change(update) {
+  change(update, guard = () => {}) {
     const task = (queues.get(this.pi) || Promise.resolve()).then(async () => {
-      const settings = await this.pi.plugin.getSettings();
+      guard(); const settings = await this.pi.plugin.getSettings(); guard();
       const current = settings?.[KEY];
       if (current !== undefined && (!record(current) || current.version !== 1 || !record(current.scopes))) fail('mapping_invalid', 'Stored session mappings changed unexpectedly.');
       const scopes = { ...(current?.scopes || {}) };
@@ -35,8 +35,9 @@ class SessionStore {
       validateData(next);
       const result = update(next);
       validateData(next);
-      if (!Object.hasOwn(scopes, this.key) && Object.keys(scopes).length >= 16) fail('mapping_limit', 'Too many saved server/workspace bindings; local cleanup is required.');
+      if (!Object.hasOwn(scopes, this.key) && Object.keys(scopes).length >= 64) fail('mapping_limit', 'Too many saved server/workspace bindings; local cleanup is required.');
       scopes[this.key] = next;
+      guard();
       await this.pi.plugin.setSettings({ [KEY]: { version: 1, scopes } });
       this.data = next;
       return result;
@@ -45,16 +46,16 @@ class SessionStore {
   }
   binding(runtimeId, aaId) { return this.data.bindings.find(b => b.runtimeId === runtimeId && b.aaId === aaId); }
   native(runtimeId, piId) { return this.data.bindings.find(b => b.runtimeId === runtimeId && b.piId === piId); }
-  async bind(runtimeId, aaId, piId) {
+  async bind(runtimeId, aaId, piId, guard) {
     return this.change(data => {
       const old = data.bindings.find(b => b.runtimeId === runtimeId && b.aaId === aaId);
       if (old && old.piId !== piId) fail('session_identity_conflict', 'Session identity does not match the stored binding.');
       if (old) return old;
       if (data.bindings.length >= 200) fail('mapping_limit', 'Session mapping limit reached.');
       const binding = { runtimeId, aaId, piId }; data.bindings.push(binding); return binding;
-    });
+    }, guard);
   }
-  async receipt(key, digest) {
+  async receipt(key, digest, guard) {
     return this.change(data => {
       const old = data.receipts.find(r => r.key === key);
       if (old) {
@@ -64,7 +65,7 @@ class SessionStore {
       }
       if (data.receipts.length >= 1000) fail('mapping_limit', 'Operation receipt limit reached; local review is required before cleanup.');
       data.receipts.push({ key, digest, status: 'pending' }); return { duplicate: false };
-    });
+    }, guard);
   }
   async finish(key, result) {
     return this.change(data => { const r = data.receipts.find(item => item.key === key); if (!r) fail('mapping_invalid', 'Missing operation receipt.'); r.status = 'done'; r.result = result; });

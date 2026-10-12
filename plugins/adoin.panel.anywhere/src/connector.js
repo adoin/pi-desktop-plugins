@@ -208,7 +208,7 @@ class Connector {
           try { if (this.runtime.running && sessions.ready) await sessions.tick(); }
           catch (error) {
             this.log('session_sync_failed', error instanceof SafeError ? error.code : 'HOST_OPERATION_FAILED');
-            if (['workspace_changed', 'workspace_denied', 'host_api_unavailable'].includes(error?.code)) { sessions.stop(); this.log('sharing_stopped', 'WORKSPACE_OR_HOST_CHANGED'); }
+            if (['workspace_changed', 'workspace_denied', 'host_api_unavailable', 'project_selection_changed', 'projects_unavailable'].includes(error?.code)) { sessions.stop(); this.log('sharing_stopped', 'WORKSPACE_OR_HOST_CHANGED'); }
           }
           if (this.alive(generation) && this.sessions === sessions) this.timer(() => { void sync(); }, 3000);
         };

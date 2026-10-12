@@ -149,3 +149,14 @@ button:disabled { opacity: .48; cursor: not-allowed; }
 .saved-connection #savedState { color: var(--fg); }
 .saved-connection input[type="password"] { width: 100%; }
 .saved-connection #forgetConnection { color: var(--danger); }
+
+.project-actions { margin-top: 16px; gap: 8px; }
+.project-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin-top: 12px; }
+.project-option { display: grid; grid-template-columns: 16px minmax(0, 1fr); align-items: start; gap: 12px; margin: 0; padding: 12px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.project-option input { width: 16px; height: 16px; margin: 4px 0 0; accent-color: var(--accent); }
+.project-option strong, .project-option span { display: block; min-width: 0; overflow-wrap: anywhere; }
+.project-option strong { color: var(--fg); }
+.project-option:has(input:checked) { background: var(--accent-soft); border-color: var(--accent); }
+.project-option:hover { border-color: var(--accent); }
+.project-option:has(input:disabled) { opacity: .6; cursor: not-allowed; }
+#projectsCount { color: var(--accent); font-variant-numeric: tabular-nums; }

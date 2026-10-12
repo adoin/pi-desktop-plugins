@@ -1,12 +1,50 @@
 # Agents Anywhere
 
-Plugin ID: **adoin.panel.anywhere**. Version: **2.1.0**.
+Plugin ID: **adoin.panel.anywhere**. Version: **2.2.0**.
 
-Connect the selected Pi Desktop workspace to the current Agents Anywhere
+Connect the selected Pi Desktop workspace or saved projects to the current Agents Anywhere
 Connector protocol. Discover sessions, create/send messages, synchronize text
 replies and status, interrupt turns, and reconnect with durable request dedup.
 Supports official Cloud and compatible self-hosted HTTPS origins. Publication
 approval remains separate from the version label; legacy support is unchanged.
+
+## Batch project sharing (2.2.0)
+
+In Connections, load the saved Pi projects, select all or choose specific rows,
+and enable **Share selected saved projects instead of current workspace**. Then
+confirm connection and session sharing and reconnect. One confirmation covers
+the selected project set; no manual project creation in Anywhere is needed for
+projects that already contain real Pi sessions. Pi's saved-project inventory is
+read locally through `project/list`, not by scanning directories.
+
+The panel shows at most 200 projects and permits 1–32 selected roots. Saved choices
+are scoped to server/profile/Connector ID and pin both project ID and path. Opening
+a panel with saved connection metadata automatically reloads the local inventory
+and restores matching choices; new/moved projects stay unselected. Loading the
+list does not connect, export sessions or grant consent. Selection changes take
+effect only on reconnect; Disconnect revokes current sharing immediately.
+
+Anywhere creates and associates projects from real `session.meta.upsert` records
+and their `cwd`. Empty projects cannot be independently registered using the
+Connector protocol: they appear after a real eligible session exists. No blank
+session is created just to populate the project list. Remote project names may
+be derived from directories rather than Pi's display labels.
+
+Each selected root has its own bridge, mappings and deduplication receipts.
+Batch mode continues when you switch the active Pi workspace, but validates that
+each selected saved project still has its approved path before host operations.
+Unselected roots and readonly/native imports remain inaccessible. With multiple
+projects, creating a remote session requires a selected project cwd; an omitted
+or unrelated directory is refused. Moving an already bound session between
+selected projects is refused before conflicting mappings can be saved; review
+and narrow the selection locally rather than automatically migrating history.
+
+Polling visits up to four selected roots per pass (ten sessions per root), rotating
+through the set. Initial project visibility may therefore take several polling
+passes. Deselecting projects never deletes already uploaded remote history or
+aborts accepted turns. Without batch mode, the existing current-workspace-only
+behavior remains unchanged. Choices persist in `anywhereProjectSelectionV1` (up
+to 16 server/Connector scopes); no token or transcript is stored in this setting.
 
 ## Self-hosted setup (2.1.0)
 
@@ -121,10 +159,10 @@ Current source contract: Agents Anywhere
 `/api/v2/connector` HTTP endpoints; custom RPC uses its Bearer WebSocket endpoint.
 There is no JSON-RPC impersonation or automatic protocol downgrade.
 
-Every host operation rechecks the captured workspace. Equivalent native path
-spellings are accepted; remote workspace switching, imported/read-only native
+Every host operation rechecks the captured workspace or explicitly selected saved
+project. Equivalent native path spellings are accepted; unapproved roots, imported/read-only native
 sessions and other project paths are excluded. Discovery pages contain at most
-100 sessions. Polling synchronizes up to ten sessions per pass, scheduled three
+100 sessions. Current-workspace polling synchronizes up to ten sessions per pass, scheduled three
 seconds after completion. Explicit history sync reads at most ten pages of 100
 messages, limited to 16,000 characters per item. Empty text-only records, tool
 output, attachments and nested tool messages are omitted. `complete:false`
@@ -133,7 +171,7 @@ are not automatically deleted.
 
 Scoped identity mappings and accepted/pending operation receipts prevent replay
 of delivered create/send requests. Unknown outcomes refuse automatic retry; inspect
-the native session before submitting again. Bounds: 16 server/workspace scopes,
+the native session before submitting again. Bounds: 64 server/workspace scopes,
 200 mappings and 1,000 receipts per scope, without unsafe automatic eviction.
 
 Not supported: remote approvals, steering, attachments, arbitrary commands,
@@ -177,7 +215,7 @@ send outcomes, inspect Pi locally first.
 From the repository root: `node --test tests/agents-anywhere*.test.mjs`.
 Tests cover real crypto, mocked-host full chat/persistence, negative paths,
 renderer interaction, and loopback transport. They are not production credential
-or installed-host acceptance tests. See `docs/agents-anywhere-release-2.1.0.md`
+or installed-host acceptance tests. See `docs/agents-anywhere-release-2.2.0.md`
 for this version's results, artifact hash, source/package review and publication
 status; older protocol evidence remains in the historical review documents.
 

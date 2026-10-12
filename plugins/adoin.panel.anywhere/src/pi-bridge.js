@@ -31,12 +31,22 @@ function validId(id) {
 }
 
 class PiBridge {
-  constructor(pi, workspace) {
+  constructor(pi, workspace, { savedProjectId = null } = {}) {
     this.pi = pi;
     if (!record(workspace) || !canonical(workspace.path)) fail('workspace_unavailable', 'Select a local workspace first.');
     this.workspace = Object.freeze({ ...workspace });
     this.boundPath = canonical(workspace.path);
+    this.savedProjectId = savedProjectId;
     this.epoch = 0; this.context = new AsyncLocalStorage();
+  }
+
+  static async projects(pi) {
+    if (typeof pi.desktop?.invoke !== 'function') fail('projects_unavailable', 'The host project inventory API is unavailable.');
+    const result = await host(() => pi.desktop.invoke({ operation: 'project/list', args: [] }));
+    if (!record(result) || !Array.isArray(result.projects)) fail('projects_unavailable', 'The host returned an invalid project inventory.');
+    const projects = result.projects.filter(p => record(p) && Number.isSafeInteger(p.id) && p.id >= 0 && canonical(p.path))
+      .map(p => ({ id: String(p.id), path: p.path, name: text(p.name) ? p.name : path.basename(p.path) }));
+    return projects;
   }
 
   static async capture(pi) {
@@ -54,6 +64,13 @@ class PiBridge {
   guard() { if (this.context.getStore() !== undefined && this.context.getStore() !== this.epoch) fail('sharing_inactive', 'Session sharing was cancelled during the host operation.'); }
   async checkWorkspace() {
     this.guard();
+    if (this.savedProjectId !== null) {
+      const projects = await PiBridge.projects(this.pi); this.guard();
+      if (!projects.some(p => p.id === this.savedProjectId && canonical(p.path) === this.boundPath)) {
+        fail('project_selection_changed', 'An approved project was removed or moved. Reload project selection locally.');
+      }
+      return;
+    }
     const current = await host(() => this.pi.workspace.get());
     this.guard();
     if (!record(current) || canonical(current.path) !== this.boundPath) {

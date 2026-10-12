@@ -15,7 +15,7 @@
   <main>
     <header>
       <div class="brand"><span class="brandmark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M12 10l-4 4a6 6 0 008 8l4-4M20 22l4-4a6 6 0 00-8-8l-4 4M12 20l8-8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg></span><h1>Agents Anywhere</h1></div>
-      <span class="badge">2.1.0</span>
+      <span class="badge">2.2.0</span>
     </header>
     <nav class="tabs" role="tablist" aria-label="Anywhere" aria-orientation="horizontal">
       <button id="tab-status" type="button" role="tab" aria-selected="true" aria-controls="panel-status" tabindex="0" data-i18n="tabStatus">Status</button>
@@ -62,6 +62,19 @@
         <input id="vaultPassword" type="password" autocomplete="off" maxlength="1024" />
         <label class="consent"><input id="forgetConsent" type="checkbox" /><span data-i18n="forgetConsent">Disconnect and forget saved connection only; keep session mappings</span></label>
         <button id="forgetConnection" type="button" data-i18n="forgetConnection" disabled>Forget saved connection</button>
+      </fieldset>
+      <fieldset class="saved-connection project-scope" aria-describedby="projectsHelp">
+        <legend data-i18n="projectsTitle">Saved project sharing</legend>
+        <label class="consent"><input id="useProjects" type="checkbox" /><span data-i18n="useProjects">Share selected saved projects instead of current workspace</span></label>
+        <p id="projectsHelp" data-i18n="projectsHelp">Load local saved projects, then select up to 32. On Connect, with sharing consent, paths, titles and conversation text are uploaded. Empty projects appear remotely only after a real session exists. New projects are not automatically selected. Changes apply only on reconnect; Disconnect to revoke immediately.</p>
+        <div class="actions project-actions">
+          <button id="loadProjects" type="button" data-i18n="loadProjects">Load saved projects</button>
+          <button id="selectAllProjects" type="button" data-i18n="selectAllProjects" disabled>Select all</button>
+          <button id="clearProjects" type="button" data-i18n="clearProjects" disabled>Clear selection</button>
+        </div>
+        <p id="projectsState" role="status" aria-live="polite"></p>
+        <p id="projectsCount" role="status" aria-live="polite"></p>
+        <div id="projectsList" class="project-list"></div>
       </fieldset>
       <label class="consent"><input id="consent" type="checkbox" /><span data-i18n="consent">I trust the server origin entered above and allow sending my Connector credentials to it. Sessions are shared only if separately checked below.</span></label>
       <label class="consent"><input id="shareSessions" type="checkbox" /><span data-i18n="shareSessions">Share sessions in the currently open workspace and allow remote create/send/interrupt. Conversation text will be sent to this server; Pi local tool permissions still apply.</span></label>

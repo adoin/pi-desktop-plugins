@@ -33,7 +33,7 @@ class SessionService {
     if (!b) {
       const piId = id(params.externalSessionId, 'externalSessionId');
       await this.bridge.get(piId); this.guard(epoch);
-      b = await this.store.bind(this.runtimeId, aaId, piId);
+      b = await this.store.bind(this.runtimeId, aaId, piId, () => { this.guard(epoch); this.checkBinding?.(piId, aaId); });
     }
     await this.bridge.get(b.piId); this.guard(epoch); return b;
   }
@@ -54,7 +54,8 @@ class SessionService {
       let b = this.store.native(this.runtimeId, s.id);
       if (!b) {
         const namespace = this.runtimeId === 'pi' ? this.context.connectorId : `${this.context.connectorId}:pi:${this.runtimeId}`;
-        b = await this.store.bind(this.runtimeId, `sess_pi_${hash(`${namespace}:pi:${s.id}`).slice(0, 24)}`, s.id);
+        const aaId = `sess_pi_${hash(`${namespace}:pi:${s.id}`).slice(0, 24)}`;
+        b = await this.store.bind(this.runtimeId, aaId, s.id, () => { this.guard(epoch); this.checkBinding?.(s.id, aaId); });
       }
       const meta = this.meta(b, s); sessions.push(meta);
       await this.publish('session.meta.upsert', { ...meta, lastActivityAt: meta.orderingTime }, epoch);
@@ -140,7 +141,7 @@ class SessionService {
     // Page through the full inventory so older bound conversations remain live.
     for (const s of sessions) {
       this.guard(epoch); const b = this.store.binding(this.runtimeId, s.sessionId);
-      try { await this.syncBinding(b); } catch (error) { if (error?.code === 'workspace_changed' || !this.ready) throw error; this.log('session_sync_failed'); }
+      try { await this.syncBinding(b); } catch (error) { if (['workspace_changed', 'project_selection_changed', 'projects_unavailable'].includes(error?.code) || !this.ready) throw error; this.log('session_sync_failed'); }
     }
     this.pollCursor = nextCursor;
   }
@@ -169,7 +170,7 @@ class SessionService {
     let reserved = false, mutationStarted = false;
     try {
       const digest = hash(JSON.stringify([method, params.content, params.title || '', params.selections || {}]));
-      const receipt = await this.store.receipt(key, digest);
+      const receipt = await this.store.receipt(key, digest, () => this.guard(epoch));
       reserved = !receipt.duplicate; this.guard(epoch);
       if (receipt.duplicate) return receipt.result;
       if (create && b) fail('session_identity_conflict', 'This platform session is already bound; send a message instead of creating it again.');
@@ -177,7 +178,7 @@ class SessionService {
       if (create && !binding) {
         mutationStarted = true;
         const created = await this.bridge.create({ title: typeof params.title === 'string' ? params.title.slice(0, 256) : 'Anywhere session', modelKey: params.selections?.model });
-        binding = await this.store.bind(runtimeId, aaId, created.id); this.guard(epoch);
+        binding = await this.store.bind(runtimeId, aaId, created.id, () => this.checkBinding?.(created.id, aaId, runtimeId)); this.guard(epoch);
       }
       const detail = await this.bridge.get(binding.piId); this.guard(epoch);
       if (!create && params.selections?.model) {
@@ -188,7 +189,7 @@ class SessionService {
       const status = await this.bridge.status(binding.piId); this.guard(epoch);
       if (status.isRunning) fail('session_busy', 'Wait for the current Pi turn to finish.');
       const messageId = randomUUID();
-      await this.store.change(data => { const r = data.receipts.find(r => r.key === key); r.piId = binding.piId; r.messageId = messageId; if (params.clientMessageId) r.clientMessageId = params.clientMessageId; });
+      await this.store.change(data => { const r = data.receipts.find(r => r.key === key); r.piId = binding.piId; r.messageId = messageId; if (params.clientMessageId) r.clientMessageId = params.clientMessageId; }, () => this.guard(epoch));
       this.guard(epoch); this.turnReasons.delete(binding.piId);
       mutationStarted = true;
       const accepted = await this.bridge.prompt(binding.piId, params.content, messageId);
