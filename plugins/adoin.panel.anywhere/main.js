@@ -6,6 +6,7 @@ const { PROFILES } = require('./src/profiles');
 const { PiBridge } = require('./src/pi-bridge');
 const { SessionService } = require('./src/sessions');
 const { ConnectionStore } = require('./src/connection-store');
+const { requireSafeFetch } = require('./src/safe-fetch');
 let setupEpoch = 0;
 function stop() { setupEpoch++; client?.disconnect(); }
 let client = null, saved = null, savedError = null, connectionBusy = false;
@@ -74,7 +75,7 @@ async function onPanelInvoke(channel, payload) {
         }
         if (useSaved && payload.rememberConnection === true) fail('INVALID_CONFIG', 'Choose saved credentials or save new credentials, not both.');
         if ((useSaved || payload.rememberConnection === true) && (typeof payload.vaultPassword !== 'string' || payload.vaultPassword.length < 12 || payload.vaultPassword.length > 1024)) fail('password_invalid', 'Use a password of 12–1024 characters.');
-        let config = validateConfig({ ...payload, ...(useSaved ? { connectorToken: 'saved-credential-placeholder' } : {}) }, manifest.net.domains, PROFILES);
+        let config = validateConfig({ ...payload, ...(useSaved ? { connectorToken: 'saved-credential-placeholder' } : {}) }, manifest.net.domains, PROFILES, manifest.permissions);
         if (typeof pi.net?.fetch !== 'function' || typeof pi.net?.websocket?.connect !== 'function' || typeof pi.net?.websocket?.send !== 'function' || typeof pi.net?.websocket?.close !== 'function' || typeof pi.events?.on !== 'function' || typeof pi.events?.off !== 'function') {
           fail('UNSUPPORTED', 'Host network/event APIs are unavailable.');
         }
@@ -84,9 +85,10 @@ async function onPanelInvoke(channel, payload) {
         let sessions = null;
         const guard = () => { if (epoch !== setupEpoch || client !== owner) fail('UNAVAILABLE', 'Connection setup was cancelled.'); };
         try {
+          await requireSafeFetch(pi); guard();
           if (useSaved) {
             const connectorToken = await storage.unlock(config, payload.vaultPassword); guard();
-            config = validateConfig({ ...config, connectorToken, consent: true }, manifest.net.domains, PROFILES);
+            config = validateConfig({ ...config, connectorToken, consent: true }, manifest.net.domains, PROFILES, manifest.permissions);
           }
           if (payload.shareSessions === true) {
             const workspace = await PiBridge.capture(pi); guard();

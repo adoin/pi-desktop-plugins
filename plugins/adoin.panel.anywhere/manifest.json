@@ -2,27 +2,27 @@
   "schemaVersion": 1,
   "id": "adoin.panel.anywhere",
   "name": "Agents Anywhere",
-  "version": "2.0.0",
-  "description": "Opt-in workspace chat through the current Agents Anywhere Connector protocol: discover, create, send, sync replies, interrupt and reconnect.",
+  "version": "2.1.0",
+  "description": "Connect workspace chat to official or self-hosted Agents Anywhere with explicit consent, encrypted credentials and host-enforced redirect refusal.",
   "i18n": {
     "en": {
       "name": "Agents Anywhere",
-      "description": "Share the selected workspace's Pi sessions with Agents Anywhere. Discover sessions, create chats, send messages, sync text replies and interrupt turns.",
-      "safetyNotes": "High risk: separate sharing consent uploads workspace paths, session titles, user/assistant text, model identifiers and status to the declared server and permits remote prompts and interruption under existing session permissions. New sessions require native Ask confirmation. Address, Connector ID and scoped session receipts persist locally. Optional token storage uses password-derived AES-256-GCM encryption; the password is never saved. Weak passwords allow offline guessing. Restart requires unlock and new sharing consent; uninstall may remove saved data. No pasted command execution or approval bypass. Disconnect does not abort accepted turns. Cloud acceptance and host redirect security review remain pending."
+      "description": "Connect Pi workspace sessions to official or self-hosted Agents Anywhere. Discover, create, send, synchronize text replies and interrupt tasks.",
+      "safetyNotes": "High risk: net.anyHost is an install-time grant for arbitrary server hosts, not a per-domain prompt. Only connect to a trusted origin you confirm locally. Credentials and, with separate sharing consent, workspace paths, titles, conversation text, model IDs and status go to that server; remote prompts use existing local session permissions. Requires PI-Desktop 0.18.0+ and redirect:error capability; authentication and ingest never follow redirects. Remote HTTP and insecure TLS bypasses are not supported. Optional token storage is password-encrypted; passwords are not saved. Disconnect does not abort accepted turns. Human release review and deployed-server acceptance are still required."
     },
     "zh-CN": {
       "name": "Agents Anywhere 远程连接",
-      "description": "经单独确认后共享当前工作区的 Pi 会话，支持发现会话、新建聊天、发送消息、同步文字回复和中断任务。",
-      "safetyNotes": "高风险：单独确认共享后，将工作区路径、标题、用户及助手文字、模型标识和状态上传至声明服务器，并允许按会话现有权限远程发消息及中断。新会话须通过宿主 Ask 确认。本地保存地址、连接器 ID 和分域会话回执；可选使用密码派生密钥及 AES-256-GCM 加密保存令牌，密码不保存。弱密码可能遭离线猜解。重启需解锁并重新确认共享；卸载可能清除数据。不执行粘贴命令，不绕过审批。断开不终止已接收任务。Cloud 验收及宿主重定向安全核验仍待完成。"
+      "description": "将 Pi 工作区会话接入官方或自部署 Agents Anywhere，支持发现、新建、发送、同步文字回复和中断任务。",
+      "safetyNotes": "高风险：net.anyHost 在安装时授权任意服务器主机访问，不会逐域名弹窗。仅连接您在本地确认的可信源地址。凭据以及另行授权共享的工作区路径、标题、对话文字、模型标识和状态将发往该服务器；远程消息按会话现有权限执行。要求 PI-Desktop 0.18.0+ 及禁止重定向能力，认证和上传均不跟随跳转。不支持远程明文 HTTP 或跳过 TLS 验证。可选密码加密保存令牌，密码不保存。断开不终止已接收任务。仍需人工发布审查及部署环境验收。"
     }
   },
   "author": "PI-Desktop Plugin Contributors",
   "main": "main.js",
   "categories": ["productivity"],
-  "changelog": "2.0.0: rename the plugin to adoin.panel.anywhere and organize the panel into Status, Connections and Events tabs with remembered selection and keyboard navigation. Retain password-encrypted connections, explicit sharing consent and current-protocol chat. Plugin-private data does not migrate automatically across the ID change. Permissions and official-host allowlist unchanged.",
-  "permissions": ["ui.panel", "ui.view", "net.fetch", "net.websocket", "background.service", "desktop.control", "models.list"],
+  "changelog": "2.1.0: support user-confirmed self-hosted HTTPS origins through the official net.anyHost permission. Require PI-Desktop 0.18.0+ redirect capability before networking; refuse redirects for authentication, token refresh and session ingest, with terminal sanitized diagnostics. Preserve origin-bound encrypted credentials, scoped session mappings and tab preferences.",
+  "permissions": ["ui.panel", "ui.view", "net.fetch", "net.websocket", "background.service", "desktop.control", "models.list", "net.anyHost"],
   "net": { "domains": ["web.agents-anywhere.com"] },
-  "engines": { "piDesktop": ">=0.15.9" },
+  "engines": { "piDesktop": ">=0.18.0" },
   "activationEvents": ["onStartup", "onCommand:adoin.panel.anywhere.open"],
   "ui": {
     "panel": "renderer/index.html",

@@ -6,6 +6,7 @@ const { transportCode } = require('./diagnostics');
 const { version } = require('../manifest.json');
 const { SESSION_METHODS } = require('./sessions');
 const { IngestTransport } = require('./ingest');
+const { safeFetch } = require('./safe-fetch');
 
 class Connector {
   constructor(pi, options = {}) {
@@ -64,7 +65,15 @@ class Connector {
   }
   async notify(method, params) {
     if (!this.ingest || !this.want || !this.sessions?.enabled) throw new SafeError('sharing_inactive', 'Connection is not ready for session synchronization.');
-    await this.ingest.send(method, params);
+    const generation = this.generation;
+    try { await this.ingest.send(method, params); }
+    catch (error) {
+      const code = transportCode(error);
+      if (['REDIRECT_DISALLOWED', 'REDIRECT_POLICY_UNAVAILABLE', 'PERMISSION_DENIED', 'DOMAIN_NOT_ALLOWED'].includes(code)) {
+        this.fail(generation, 'protocol_incompatible', false, `INGEST:${code}`);
+      }
+      throw error;
+    }
   }
   alive(generation) { return this.want && this.generation === generation; }
   fail(generation, state, retry, detail = '') {
@@ -84,7 +93,7 @@ class Connector {
     let stage = 'AUTH';
     const transportError = (error, at = stage) => {
       const code = transportCode(error);
-      const denied = ['PERMISSION_DENIED', 'UNSUPPORTED', 'DOMAIN_NOT_ALLOWED'].includes(code);
+      const denied = ['PERMISSION_DENIED', 'UNSUPPORTED', 'DOMAIN_NOT_ALLOWED', 'REDIRECT_DISALLOWED', 'REDIRECT_POLICY_UNAVAILABLE'].includes(code);
       this.fail(generation, denied ? 'protocol_incompatible' : 'network_error', !denied, `${at}:${code}`);
     };
     const send = async payload => {
@@ -159,7 +168,7 @@ class Connector {
     try {
       this.log('protocol', `${config.profile}:${PROFILES[config.profile].baseline}`);
       this.log('auth_request', urls.auth);
-      const result = await this.pi.net.fetch({ url: urls.auth, method: 'POST', headers: { Authorization: `Connector ${config.connectorId}:${config.connectorToken}` }, timeoutMs: 10000 });
+      const result = await safeFetch(this.pi, { url: urls.auth, method: 'POST', headers: { Authorization: `Connector ${config.connectorId}:${config.connectorToken}` }, timeoutMs: 10000 }, () => { if (!this.alive(generation)) throw new SafeError('sharing_inactive', 'Connection was cancelled.'); });
       if (!this.alive(generation)) return;
       if (!Number.isInteger(result?.status)) { this.fail(generation, 'protocol_incompatible', false, 'INVALID_HTTP_RESPONSE'); return; }
       this.log('auth_http', String(result.status));

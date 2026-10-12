@@ -1,5 +1,6 @@
 'use strict';
 const { fail, record } = require('./config');
+const { safeFetch } = require('./safe-fetch');
 const METHODS = new Set(['timeline.sync', 'session.meta.upsert', 'session.state.updated', 'runtime.capability.updated', 'runtime.catalog.updated']);
 class IngestTransport {
   constructor(pi, config, auth, log = () => {}) {
@@ -13,7 +14,7 @@ class IngestTransport {
     this.guard(); if (this.refreshing) return this.refreshing;
     const operation = (async () => {
       const c = this.config;
-      const result = await this.pi.net.fetch({ url: `${c.serverUrl}/api/v2/connector/auth`, method: 'POST', headers: { Authorization: `Connector ${c.connectorId}:${c.connectorToken}` }, timeoutMs: 10000 });
+      const result = await safeFetch(this.pi, { url: `${c.serverUrl}/api/v2/connector/auth`, method: 'POST', headers: { Authorization: `Connector ${c.connectorId}:${c.connectorToken}` }, timeoutMs: 10000 }, () => this.guard());
       this.guard(); this.log('auth_http', String(Number.isInteger(result?.status) ? result.status : 0));
       if (result?.status !== 200 || typeof result.bodyText !== 'string' || result.bodyText.length > 16384) fail('ingest_auth_failed', 'Could not refresh synchronization credentials.');
       let auth; try { auth = JSON.parse(result.bodyText); } catch { fail('ingest_auth_failed', 'Invalid synchronization authentication response.'); }
@@ -30,7 +31,7 @@ class IngestTransport {
     if (Date.now() >= this.expires) await this.refresh();
     for (let attempt = 0; attempt < 2; attempt++) {
       this.guard();
-      const result = await this.pi.net.fetch({ url: `${this.config.serverUrl}/api/v2/connector/ingest`, method: 'POST', headers: { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json' }, body, timeoutMs: 15000 });
+      const result = await safeFetch(this.pi, { url: `${this.config.serverUrl}/api/v2/connector/ingest`, method: 'POST', headers: { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json' }, body, timeoutMs: 15000 }, () => this.guard());
       this.guard();
       if (result?.status === 401 && attempt === 0) { await this.refresh(); continue; }
       if (result?.status !== 200 || typeof result.bodyText !== 'string' || result.bodyText.length > 65536) { this.log('ingest_failed', Number.isInteger(result?.status) ? `HTTP_${result.status}` : 'INVALID_RESPONSE'); fail('ingest_failed', 'Server did not accept synchronization.'); }

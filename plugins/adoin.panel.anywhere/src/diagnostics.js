@@ -4,6 +4,8 @@ function transportCode(error) {
   const fields = [error?.code, error?.errorCode, error?.data?.errorCode, error?.cause?.code];
   const message = [typeof error === 'string' ? error : '', error?.message, error?.error?.message, error?.cause?.message].filter(value => typeof value === 'string').join(' ').slice(0, 8192);
   const values = `${fields.filter(value => typeof value === 'string').join(' ')} ${message}`;
+  if (/REDIRECT_POLICY_UNAVAILABLE/i.test(values)) return 'REDIRECT_POLICY_UNAVAILABLE';
+  if (/REDIRECT_DISALLOWED/i.test(values)) return 'REDIRECT_DISALLOWED';
   if (/PERMISSION_DENIED|EACCES|EPERM|permission (?:denied|not granted)/i.test(values)) return 'PERMISSION_DENIED';
   if (/DOMAIN_NOT_ALLOWED|not in manifest\.net\.domains|declares no manifest\.net\.domains/i.test(values)) return 'DOMAIN_NOT_ALLOWED';
   if (/UNSUPPORTED|host api not available/i.test(values)) return 'UNSUPPORTED';

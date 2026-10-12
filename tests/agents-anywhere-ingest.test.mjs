@@ -13,14 +13,14 @@ const rejects = (promise, code) => assert.rejects(promise, { code });
 function deferred() { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; }
 function fixture(handler = () => accepted(), credentials = auth) {
   const calls = [], logs = [];
-  const transport = new IngestTransport({ net: { fetch: async input => { calls.push(input); return handler(input, calls.length); } } }, config, credentials, (...args) => logs.push(args));
+  const transport = new IngestTransport({ net: { getCapabilities: async () => ({ fetchRedirectModes: ['error'] }), fetch: async input => { assert.equal(input.redirect, 'error'); calls.push(input); return handler(input, calls.length); } } }, config, credentials, (...args) => logs.push(args));
   return { transport, calls, logs };
 }
 const methods = ['timeline.sync', 'session.meta.upsert', 'session.state.updated', 'runtime.capability.updated', 'runtime.catalog.updated'];
 for (const method of methods) test(`sends ${method} using the bounded authenticated notification envelope`, async () => {
   const f = fixture(), params = { runtimeId: 'synthetic-runtime', nested: { text: 'hello' } };
   await f.transport.send(method, params);
-  assert.deepEqual(f.calls, [{ url: `${config.serverUrl}/api/v2/connector/ingest`, method: 'POST', headers: { Authorization: `Bearer ${auth.accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ notifications: [{ method, params }] }), timeoutMs: 15000 }]);
+  assert.deepEqual(f.calls, [{ url: `${config.serverUrl}/api/v2/connector/ingest`, method: 'POST', headers: { Authorization: `Bearer ${auth.accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ notifications: [{ method, params }] }), timeoutMs: 15000, redirect: 'error' }]);
   assert.deepEqual(f.logs, []);
 });
 
@@ -47,8 +47,8 @@ test('expired credentials refresh once for concurrent sends and use only the new
   const gate = deferred();
   const f = fixture(input => input.url.endsWith('/auth') ? gate.promise : accepted(), { ...auth, expiresIn: 60 });
   const pending = [f.transport.send('timeline.sync', { id: 1 }), f.transport.send('timeline.sync', { id: 2 })];
-  assert.equal(f.calls.length, 1);
-  assert.deepEqual(f.calls[0], { url: `${config.serverUrl}/api/v2/connector/auth`, method: 'POST', headers: { Authorization: `Connector ${config.connectorId}:${config.connectorToken}` }, timeoutMs: 10000 });
+  await new Promise(resolve => setImmediate(resolve)); assert.equal(f.calls.length, 1);
+  assert.deepEqual(f.calls[0], { url: `${config.serverUrl}/api/v2/connector/auth`, method: 'POST', headers: { Authorization: `Connector ${config.connectorId}:${config.connectorToken}` }, timeoutMs: 10000, redirect: 'error' });
   gate.resolve(refreshed()); await Promise.all(pending);
   assert.equal(f.calls.length, 3);
   for (const call of f.calls.slice(1)) assert.equal(call.headers.Authorization, 'Bearer synthetic-refreshed-token');

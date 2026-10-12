@@ -18,7 +18,8 @@ function fixture(overrides = {}) {
   let next = 1;
   const accessToken = secret();
   const pi = { events, net: {
-    fetch: async input => { requests.push(input); return overrides.fetch ? overrides.fetch(input) : { status: 200, bodyText: JSON.stringify({ accessToken, expiresIn: 900 }) }; },
+    getCapabilities: async () => ({ fetchRedirectModes: ['error'] }),
+    fetch: async input => { assert.equal(input.redirect, 'error'); requests.push(input); return overrides.fetch ? overrides.fetch(input) : { status: 200, bodyText: JSON.stringify({ accessToken, expiresIn: 900 }) }; },
     websocket: {
       connect: async input => { sockets.push(input); return overrides.connect ? overrides.connect(input, events) : { socketId: `socket-${sockets.length}` }; },
       send: async input => { sent.push(JSON.parse(input.data)); if (overrides.send) return overrides.send(input); },
@@ -33,13 +34,14 @@ function fixture(overrides = {}) {
 }
 
 test('manifest pins renamed stable version, exact permissions and bilingual install disclosures', () => {
-  assert.equal(manifest.id, 'adoin.panel.anywhere'); assert.equal(manifest.version, '2.0.0');
+  assert.equal(manifest.id, 'adoin.panel.anywhere'); assert.equal(manifest.version, '2.1.0');
+  assert.equal(manifest.engines.piDesktop, '>=0.18.0');
   assert.ok(!/beta/i.test(manifest.name));
   assert.deepEqual(manifest.activationEvents, ['onStartup', 'onCommand:adoin.panel.anywhere.open']);
   assert.equal(manifest.contributes.commands[0].id, 'adoin.panel.anywhere.open');
   assert.equal(manifest.contributes.views[0].id, 'adoin-panel-anywhere');
   assert.equal(manifest.contributes.services[0].id, 'adoin-panel-anywhere-connection');
-  assert.deepEqual(manifest.permissions, ['ui.panel', 'ui.view', 'net.fetch', 'net.websocket', 'background.service', 'desktop.control', 'models.list']);
+  assert.deepEqual(manifest.permissions, ['ui.panel', 'ui.view', 'net.fetch', 'net.websocket', 'background.service', 'desktop.control', 'models.list', 'net.anyHost']);
   assert.deepEqual(manifest.net.domains, ['web.agents-anywhere.com']);
   for (const locale of ['en', 'zh-CN']) { for (const key of ['name', 'description', 'safetyNotes']) assert.ok(manifest.i18n[locale][key]); assert.ok(manifest.ui.title[locale]); }
 });
@@ -140,7 +142,7 @@ test('revoked credential and duplicate connector stop retry and clear credential
 });
 test('disconnect during auth prevents a WS connection; late WS handle is closed', async () => {
   let resolveAuth; const f = fixture({ fetch: () => new Promise(resolve => { resolveAuth = resolve; }) });
-  f.client.connect(config()); const opening = f.client.opening; f.client.disconnect();
+  f.client.connect(config()); const opening = f.client.opening; await flush(); f.client.disconnect();
   resolveAuth({ status: 200, bodyText: JSON.stringify({ accessToken: secret(), expiresIn: 900 }) }); await opening; assert.equal(f.sockets.length, 0);
   let resolveSocket; const s = fixture({ connect: () => new Promise(resolve => { resolveSocket = resolve; }) });
   s.client.connect(config()); await flush(); const wait = s.client.opening; s.client.disconnect(); resolveSocket({ socketId: 'late' }); await wait; await flush();
@@ -258,4 +260,49 @@ test('invalid revisions, names and config retain strict checks without changing 
     for (const config of [null, [], { unexpected: true }]) assert.throws(() => runtime.dispatch(method, { ...params, config }), /configuration/);
     assert.equal(runtime.dispatch('runtime.config', { runtime: 'pi', runtimeId: params.runtimeId }).config.revision, params.configRevision);
   }
+});
+
+test('self-hosted config requires manifest anyHost intent and local consent, without weakening origin checks', () => {
+  const validate = patch => validateConfig({ ...config(), serverUrl: 'https://selfhost.example:8443', ...patch }, manifest.net.domains, PROFILES, manifest.permissions);
+  assert.equal(validate({}).serverUrl, 'https://selfhost.example:8443');
+  assert.equal(validate({ serverUrl: 'https://[::1]:8443' }).serverUrl, 'https://[::1]:8443');
+  assert.throws(() => validate({ consent: false }), { code: 'CONSENT_REQUIRED' });
+  for (const serverUrl of ['http://selfhost.example', 'https://user:pass@selfhost.example', 'https://selfhost.example/api/v2', 'https://selfhost.example?token=x', 'https://selfhost.example/#fragment']) assert.throws(() => validate({ serverUrl }));
+});
+
+test('capability absence and redirect refusal are terminal, sanitized and never downgrade', async () => {
+  for (const getCapabilities of [undefined, async () => ({}), async () => ({ fetchRedirectModes: ['follow'] }), async () => { throw new Error('private capability failure'); }]) {
+    const f = fixture(); f.pi.net.getCapabilities = getCapabilities;
+    f.client.connect(config()); await f.client.opening;
+    assert.equal(f.client.state, 'protocol_incompatible'); assert.equal(f.client.config, null);
+    assert.equal(f.requests.length, 0); assert.equal(f.sockets.length, 0); assert.equal(f.timers.size, 0);
+    assert.ok(JSON.stringify(f.client.status()).includes('REDIRECT_POLICY_UNAVAILABLE'));
+    assert.ok(!JSON.stringify(f.client.status()).includes('private capability failure'));
+  }
+  for (const status of [301, 302, 303, 307, 308]) {
+    const f = fixture({ fetch: async () => ({ status, headers: { location: 'https://other.invalid' } }) });
+    f.client.connect({ ...config(), serverUrl: 'https://selfhost.example:8443' }); await f.client.opening;
+    assert.equal(f.requests.length, 1); assert.equal(f.sockets.length, 0); assert.equal(f.timers.size, 0);
+    assert.equal(f.client.state, 'protocol_incompatible'); assert.equal(f.client.config, null);
+    assert.ok(JSON.stringify(f.client.status()).includes('REDIRECT_DISALLOWED'));
+  }
+});
+
+test('disconnect while capabilities are pending prevents auth entirely', async () => {
+  let release; const f = fixture();
+  f.pi.net.getCapabilities = () => new Promise(resolve => { release = resolve; });
+  f.client.connect(config()); const pending = f.client.opening; f.client.disconnect();
+  release({ fetchRedirectModes: ['error'] }); await pending;
+  assert.equal(f.requests.length, 0); assert.equal(f.sockets.length, 0); assert.equal(f.timers.size, 0);
+});
+
+test('self-hosted auth and socket stay on selected origin; denied custom-host grants are terminal', async () => {
+  const f = fixture(), c = { ...config(), serverUrl: 'https://selfhost.example:8443' };
+  f.client.connect(c); await f.client.opening;
+  assert.equal(f.requests[0].url, `${c.serverUrl}/api/v2/connector/auth`);
+  assert.equal(f.sockets[0].url, 'wss://selfhost.example:8443/api/v2/connector/ws'); f.client.disconnect();
+  const denied = fixture({ fetch: async () => { throw Object.assign(new Error('private details'), { code: 'PERMISSION_DENIED' }); } });
+  denied.client.connect(c); await denied.client.opening;
+  assert.equal(denied.client.state, 'protocol_incompatible'); assert.equal(denied.client.config, null);
+  assert.equal(denied.sockets.length, 0); assert.equal(denied.timers.size, 0);
 });

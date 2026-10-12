@@ -7,14 +7,14 @@
       discovered: 'Runtime discovered', running: 'Runtime running',
       visibility: 'An online socket does not prove device visibility in Cloud.',
       settings: 'Connection settings', command: 'Paste CLI command (parsed only, never executed)',
-      parse: 'Parse command', origin: 'Server origin', connectorId: 'Connector ID', token: 'Connector token',
+      parse: 'Parse command', origin: 'Server origin (official or self-hosted HTTPS, optional port)', connectorId: 'Connector ID', token: 'Connector token',
       profile: 'Protocol profile', current: 'Current', legacy: 'Legacy',
-      consent: 'Allow connection to the selected server. Sessions are shared only if separately checked below.',
+      consent: 'I trust the server origin entered above and allow sending my Connector credentials to it. Sessions are shared only if separately checked below.',
       shareSessions: 'Share current-workspace paths, titles, user/assistant text, model IDs and status with this server; allow remote create/send/interrupt under existing session permissions. New sessions require local Ask confirmation. Disconnect does not abort accepted turns.',
       runtimeId: 'Runtime instance ID', sharingEnabled: 'Session sharing allowed', sharingReady: 'Sharing ready', workspaceName: 'Approved workspace', sessionCount: 'Shared sessions', lastSyncAt: 'Last status sync',
       runtimeSetup: 'In Anywhere Web/desktop device settings, add the Pi runtime instance, save its empty config, then enable it. Discovery alone does not create an instance.',
       connect: 'Connect', disconnect: 'Disconnect', boundaries: 'Capabilities and limits',
-      security: 'No automatic downgrade or reconnect after restart. Optional password-encrypted token storage. Self-hosted domains stay restricted until a future host API supports them.',
+      security: 'Requires PI-Desktop 0.18.0+. Approve net.anyHost when installing/updating; it is an arbitrary-host grant, not a per-domain prompt. Enter a trusted direct HTTPS origin without /api/v2 or proxy subpaths. Authentication and uploads refuse redirects; TLS checks remain enabled. No automatic connection after restart.',
       verification: 'Current protocol is tested offline, not Cloud-proven. Legacy v0.1.7 cannot register Pi on its stock server and is disabled. Once locally allowed: session inventory, create/send/interrupt, and final response status sync. Remote tool approval and fine-grained streaming are not supported; local tool permissions may wait for approval locally.',
       logs: 'Connection events', logPrivacy: 'Only recognized event codes and bounded diagnostic details are shown. Credentials and remote error bodies are excluded.',
       yes: 'Yes', no: 'No', unknown: 'Unknown', event: 'Event', empty: 'No events yet.',
@@ -30,7 +30,9 @@
       invalid_config: 'Check the server origin, connector ID and token. Do not include /api/v2 or other URL paths.',
       invalid_command: 'Cannot parse the command. Check quotes and provide each connection flag exactly once.',
       insecure_origin: 'Use HTTPS. Plain HTTP is supported only for loopback development.',
-      domain_not_allowed: 'This hostname is not authorized. Update the exact manifest domain and reload with approval.',
+      domain_not_allowed: 'Custom servers require net.anyHost. Update/reload the plugin and approve the host permission.',
+      redirect_policy_unavailable: 'This host cannot refuse redirects safely. Update PI-Desktop to 0.18.0+; no request was sent.',
+      redirect_disallowed: 'Server redirect refused. Enter the direct HTTPS origin and configure auth/ingest endpoints not to redirect.',
       profile_unavailable: 'Legacy is not available: its stock server does not accept the Pi runtime.',
       unsupported: 'This operation or host API is unavailable. Check the required host version and permissions.',
       unavailable: 'The plugin or host is unavailable. Reload the plugin and review permissions.'
@@ -38,12 +40,12 @@
     'zh-CN': {
       tabStatus: '状态', tabConnections: '连接管理', tabEvents: '事件', connectionSafety: '连接安全', status: '连接状态', refresh: '刷新', discovered: '已发现运行时', running: '运行时正在运行',
       visibility: '套接字在线不代表设备已在 Cloud 中可见。', settings: '连接设置', command: '粘贴 CLI 命令（仅解析，绝不执行）',
-      parse: '解析命令', origin: '服务器源地址', connectorId: '连接器 ID', token: '连接器令牌', profile: '协议配置', current: '当前协议', legacy: '旧版协议',
-      consent: '允许连接到所选服务器。仅在下方另行勾选后才共享会话。', connect: '连接', disconnect: '断开连接', boundaries: '功能与限制',
+      parse: '解析命令', origin: '服务器源地址（官方或自部署 HTTPS，可含端口）', connectorId: '连接器 ID', token: '连接器令牌', profile: '协议配置', current: '当前协议', legacy: '旧版协议',
+      consent: '我信任上方填写的服务器源地址，并允许向它发送连接器凭据。仅在下方另行勾选后才共享会话。', connect: '连接', disconnect: '断开连接', boundaries: '功能与限制',
       shareSessions: '向此服务器共享当前工作区路径、标题、用户及助手文字、模型标识和状态，并允许按会话现有权限远程创建、发送及中断。新会话需本地确认 Ask 模式。断开不会终止已接收的任务。',
       runtimeId: '运行时实例 ID', sharingEnabled: '已允许会话共享', sharingReady: '共享已就绪', workspaceName: '已授权工作区', sessionCount: '共享会话数', lastSyncAt: '上次状态同步',
       runtimeSetup: '在 Anywhere 网页端或桌面端的设备设置中添加 Pi 运行时实例，保存其空配置，然后启用。仅发现运行时不会创建实例。',
-      security: '不会自动降级或在重启后自动连接。可选择用密码加密保存令牌。自部署域名仍受限制，待后续宿主 API 更新后接入。',
+      security: '要求 PI-Desktop 0.18.0+。安装或更新时需批准 net.anyHost 任意主机权限，不会逐域名弹窗。请填写可信的直接 HTTPS 源地址，不含 /api/v2 或代理子路径。认证和上传拒绝重定向，保留 TLS 校验；重启后不会自动连接。',
       verification: '新版仅经过离线测试，尚未通过 Cloud 实测。旧版 v0.1.7 的原版服务端不接受 Pi Runtime，暂不可用。本地授权后支持会话列表、创建、发送、中断及最终回复状态同步。不支持远程工具审批或细粒度流式传输；本地工具权限可能需要在本地等待审批。',
       logs: '连接事件', logPrivacy: '只显示已知事件代码和受限诊断信息，不显示凭据或远端错误正文。',
       yes: '是', no: '否', unknown: '未知', event: '事件', empty: '暂无事件。',
@@ -58,7 +60,9 @@
       invalid_config: '请检查服务器源地址、连接器 ID 和令牌；地址不要包含 /api/v2 或其他路径。',
       invalid_command: '无法解析命令。请检查引号，并确保每个连接参数只出现一次。',
       insecure_origin: '请使用 HTTPS；明文 HTTP 仅允许本机回环地址用于开发。',
-      domain_not_allowed: '此主机名尚未授权。请修改清单中的精确域名，重新加载插件并授权。',
+      domain_not_allowed: '自部署服务器需要 net.anyHost，请更新或重新加载插件并批准宿主权限。',
+      redirect_policy_unavailable: '宿主缺少安全拒绝重定向能力，请升级至 PI-Desktop 0.18.0+；尚未发送请求。',
+      redirect_disallowed: '已拒绝服务器重定向，请填写直接 HTTPS 源地址，并确保认证与上传端点不跳转。',
       profile_unavailable: '旧版暂不可用：其原版服务端不接受 Pi 运行时。',
       unsupported: '此操作或宿主 API 不可用，请检查宿主版本和插件权限。',
       unavailable: '插件或宿主暂不可用，请重新加载插件并检查权限。'
@@ -136,6 +140,7 @@
   for (const [code, [en, zh]] of Object.entries(storageWords)) { words.en[code] = en; words['zh-CN'][code] = zh; }
   const states = new Set(['unconfigured', 'connecting', 'online', 'reconnecting', 'authentication_failed', 'protocol_incompatible', 'network_error', 'disconnected', 'ownership_conflict']);
   const errorCodes = new Set(['authentication_failed', 'protocol_incompatible', 'network_error', 'ownership_conflict', 'request_failed', 'bridge_unavailable', 'bridge_timeout', 'permission_denied', 'not_found', 'invalid_response', 'consent_required', 'invalid_config', 'invalid_command', 'insecure_origin', 'domain_not_allowed', 'profile_unavailable', 'unsupported', 'unavailable']);
+  errorCodes.add('redirect_policy_unavailable'); errorCodes.add('redirect_disallowed');
   errorCodes.add('parser_unavailable');
   for (const code of Object.keys(sessionErrors)) errorCodes.add(code);
   for (const code of ['password_invalid', 'unlock_failed', 'saved_connection_invalid', 'saved_connection_mismatch', 'saved_connection_missing', 'persistence_unavailable', 'persistence_failed', 'persistence_busy']) errorCodes.add(code);
@@ -149,7 +154,7 @@
   let queue = Promise.resolve();
   const text = (key) => words[locale][key] || words[locale].unknown;
   const fail = (code) => Object.assign(new Error(code), { code });
-  const PANEL_VERSION = '2.0.0';
+  const PANEL_VERSION = '2.1.0';
   // Only these fixed navigation IDs may enter browser storage, never form data.
   const TAB_IDS = ['status', 'connections', 'events'];
   const TAB_STORAGE_KEY = 'adoin.panel.anywhere.activeTab.v1';
@@ -211,7 +216,7 @@
     const time = typeof entry?.time === 'string' && /^\d{4}-\d{2}-\d{2}T[\d:.Z+-]{8,24}$/.test(entry.time) ? entry.time : '';
     const value = typeof entry?.detail === 'string' ? entry.detail : '';
     const fixed = new Set(['FRAME_LIMIT', 'INVALID_JSON', 'INVALID_RPC_FRAME', 'REQUEST_LIMIT', 'RPC_ID_REUSED', 'HOST_NETWORK_ERROR', 'HOST_API_OR_PERMISSION_UNAVAILABLE', 'INVALID_HTTP_RESPONSE', 'INVALID_AUTH_RESPONSE', 'INVALID_AUTH_JSON', 'INVALID_AUTH_FIELDS', 'INVALID_SOCKET_HANDLE', 'RUNTIME_DISCOVERY_TIMEOUT', 'EARLY_EVENT_LIMIT', 'VERSION_UNKNOWN', ...[...errorCodes].map(code => code.toUpperCase())]);
-    const allowed = /^(?:\d{1,5}(?:ms)?|\d+\.\d+\.\d+(?:-(?:alpha|beta)\.\d+)?|WS_CLOSE_\d{1,4}|HTTP_\d{3}|(?:current|legacy):[a-f0-9]{40}|(?:runtime\.(?:discover|configSchema|config|validateConfig|start|stop|capabilities)|unsupported_method):(?:ok|invalid_params|runtime_conflict|runtime_not_found|runtime_not_running|method_not_found|internal_error)|(?:AUTH|WS_CONNECT|WS_EVENT|RPC_SEND|RPC|HEARTBEAT):(?:PERMISSION_DENIED|DOMAIN_NOT_ALLOWED|UNSUPPORTED|DNS_FAILURE|TLS_FAILURE|TIMEOUT|CONNECTION_REFUSED|CONNECTION_RESET|PROXY_FAILURE|HOST_NETWORK_ERROR|HTTP_\d{3}))$/;
+    const allowed = /^(?:\d{1,5}(?:ms)?|\d+\.\d+\.\d+(?:-(?:alpha|beta)\.\d+)?|WS_CLOSE_\d{1,4}|HTTP_\d{3}|(?:current|legacy):[a-f0-9]{40}|(?:runtime\.(?:discover|configSchema|config|validateConfig|start|stop|capabilities)|unsupported_method):(?:ok|invalid_params|runtime_conflict|runtime_not_found|runtime_not_running|method_not_found|internal_error)|(?:AUTH|INGEST|WS_CONNECT|WS_EVENT|RPC_SEND|RPC|HEARTBEAT):(?:REDIRECT_DISALLOWED|REDIRECT_POLICY_UNAVAILABLE|PERMISSION_DENIED|DOMAIN_NOT_ALLOWED|UNSUPPORTED|DNS_FAILURE|TLS_FAILURE|TIMEOUT|CONNECTION_REFUSED|CONNECTION_RESET|PROXY_FAILURE|HOST_NETWORK_ERROR|HTTP_\d{3}))$/;
     const bridge = value.match(/^(app\.getAppearance|anywhere\.(?:status|parse|connect|disconnect|forget))(?::([a-z_]+))?$/);
     const field = event === 'form_invalid' && ['serverUrl', 'connectorId', 'connectorToken'].includes(value);
     const endpoint = ['auth_request', 'websocket_connect'].includes(event) && /^(?:https?|wss?):\/\/[A-Za-z0-9.:[\]-]+\/(?:api\/v2\/)?connector\/(?:auth|ws)$/.test(value);

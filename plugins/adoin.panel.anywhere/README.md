@@ -1,12 +1,44 @@
 # Agents Anywhere
 
-Plugin ID: **adoin.panel.anywhere**. Version: **2.0.0**.
+Plugin ID: **adoin.panel.anywhere**. Version: **2.1.0**.
 
 Connect the selected Pi Desktop workspace to the current Agents Anywhere
 Connector protocol. Discover sessions, create/send messages, synchronize text
 replies and status, interrupt turns, and reconnect with durable request dedup.
-Publication approval and host redirect verification remain separate from the
-version label; this package does not claim complete historical compatibility.
+Supports official Cloud and compatible self-hosted HTTPS origins. Publication
+approval remains separate from the version label; legacy support is unchanged.
+
+## Self-hosted setup (2.1.0)
+
+Upgrade PI-Desktop to **0.18.0 or later**, install this update over the existing
+`adoin.panel.anywhere`, and approve the new **net.anyHost** permission in the host.
+For a dev plugin, reload/re-authorize it rather than relying on hot reload for a
+new permission. This host permission allows arbitrary hosts at install time;
+there is no per-domain host prompt. The plugin still requires local confirmation
+of the exact server you enter, plus separate workspace-sharing consent.
+
+In Connections, enter the direct origin, for example `https://anywhere.example`
+or `https://anywhere.example:8443`, and credentials issued by that server. Do not
+append `/api/v2`, a reverse-proxy prefix, query or fragment. The same current
+Connector protocol and `/api/v2/connector/{auth,ws,ingest}` endpoints must be
+available. A custom hostname is not automatic compatibility with older servers.
+Remote plaintext HTTP is rejected; HTTP loopback is for isolated development
+only. Use a valid trusted TLS certificate; the plugin never disables TLS checks.
+
+All authentication, token refresh and text/state upload requests specify
+`redirect: "error"`. Before sending, the plugin requires `error` in
+`pi.net.getCapabilities().fetchRedirectModes`; missing/failed capability checks
+stop without network I/O. Server 3xx responses are terminal, not retried or
+followed. Configure the reverse proxy to serve these endpoints directly and
+support WebSocket upgrade on the chosen origin. No endpoint discovery probes
+send credentials to other servers. Redirect errors are recorded as fixed codes,
+never Location headers or response bodies.
+
+Saved encrypted tokens and session mappings stay bound to the selected origin
+(including port). Changing server requires its own credentials; an old saved
+token cannot be unlocked for a different origin. One connection profile is
+saved at a time. Upgrade preserves existing settings and tab choice; do not
+uninstall first or delete the existing Anywhere device unnecessarily.
 
 ## Panel
 
@@ -41,7 +73,7 @@ than uninstalling first; uninstall may delete plugin data.
 
 ## Connect and share
 
-Use PI-Desktop 0.15.9+ with the declared APIs and explicitly grant its permissions.
+Use PI-Desktop 0.18.0+ with the declared APIs and explicitly grant its permissions.
 Open the intended local workspace and configure a usable Pi model. In Connections,
 paste the Anywhere connection command and parse it, or fill the origin, Connector
 ID and token. Pasted commands are parsed as data, never executed.
@@ -116,19 +148,21 @@ server and remains disabled.
 | --- | --- |
 | `ui.panel`, `ui.view` | Panel and docked entry |
 | `net.fetch`, `net.websocket` | Authentication, text/status ingest, RPC and heartbeat |
+| `net.anyHost` | Host-authorized access to user-confirmed self-hosted origins |
 | `background.service` | Explicitly started connection remains resident |
 | `desktop.control` | Read/create/configure sessions, prompt, status and abort |
 | `models.list` | Configured model identifiers/labels, never provider credentials |
 
-The only shipped allowlisted hostname is **web.agents-anywhere.com**. Self-hosted
-support awaits a suitable future host API; parsing a custom URL grants no network
-access. URLs must have no path, query, fragment or userinfo. No wildcard grants,
-raw-network bypass or remote plaintext HTTP are used.
+The default and explicitly listed hostname remains **web.agents-anywhere.com**.
+The added, user-approved `net.anyHost` grant permits custom destinations through
+the official host gateway. The host retains its cloud-metadata restrictions.
+URLs must have no path, query, fragment or userinfo. No wildcard manifest entry,
+raw-network bypass or remote plaintext HTTP is used.
 
-Host redirect limitation: the inspected fetch gateway follows redirects while
-retaining headers and exposes no opt-out. The plugin cannot alone prove
-same-origin/TLS-only forwarding. Use trusted direct, non-redirecting endpoints;
-production approval remains subject to host security verification.
+The former redirect blocker is addressed by the host's released 0.18.0 fetch
+policy and mandatory capability checks, not by trusting unknown fetch options.
+HTTP requests never follow redirects, even on the same origin. WebSocket uses
+the host broker, whose inspected implementation does not follow redirects.
 
 `anywhereConnectionV1` stores public connection metadata and optional encrypted
 token. `anywhereSessionBindingsV1` stores scoped IDs, hashes and operation receipts.
@@ -143,7 +177,7 @@ send outcomes, inspect Pi locally first.
 From the repository root: `node --test tests/agents-anywhere*.test.mjs`.
 Tests cover real crypto, mocked-host full chat/persistence, negative paths,
 renderer interaction, and loopback transport. They are not production credential
-or installed-host acceptance tests. See `docs/agents-anywhere-release-2.0.0.md`
+or installed-host acceptance tests. See `docs/agents-anywhere-release-2.1.0.md`
 for this version's results, artifact hash, source/package review and publication
 status; older protocol evidence remains in the historical review documents.
 

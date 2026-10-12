@@ -13,7 +13,7 @@ async function fixture(t) {
     plugin: { getSettings: async () => structuredClone(state.settings), setSettings: async patch => { if (state.write) await state.write(); Object.assign(state.settings, structuredClone(patch)); } },
     commands: { register: async () => {}, unregister: async () => {} }, services: { register: async () => {}, unregister: async () => {} }, ui: { openPanel: async () => {} },
     events: new EventEmitter(),
-    net: { fetch: async input => { state.requests.push(input); return { status: 200, bodyText: JSON.stringify({ accessToken: randomUUID(), expiresIn: 900 }) }; }, websocket: { connect: async () => ({ socketId: 'fixture' }), send: async () => {}, close: async () => {} } },
+    net: { getCapabilities: async () => ({ fetchRedirectModes: ['error'] }), fetch: async input => { assert.equal(input.redirect, 'error'); state.requests.push(input); return { status: 200, bodyText: JSON.stringify({ accessToken: randomUUID(), expiresIn: 900 }) }; }, websocket: { connect: async () => ({ socketId: 'fixture' }), send: async () => {}, close: async () => {} } },
   };
   await main.onLoad();
   t.after(async () => { await main.onUnload(); globalThis.pi = previous; });
@@ -48,7 +48,7 @@ test('saving metadata alone never stores token and changing selection cannot reu
   await main.onPanelInvoke('anywhere.connect', { ...f.config, rememberConnection: true, vaultPassword: f.password });
   await main.onPanelInvoke('anywhere.disconnect'); const count = f.state.requests.length;
   await assert.rejects(main.onPanelInvoke('anywhere.connect', { ...f.config, connectorId: 'conn_other', useSaved: true, vaultPassword: f.password }), { code: 'saved_connection_mismatch' });
-  await assert.rejects(main.onPanelInvoke('anywhere.connect', { ...f.config, serverUrl: 'https://self-hosted.example', useSaved: true, vaultPassword: f.password }), { code: 'DOMAIN_NOT_ALLOWED' });
+  await assert.rejects(main.onPanelInvoke('anywhere.connect', { ...f.config, serverUrl: 'https://self-hosted.example', useSaved: true, vaultPassword: f.password }), { code: 'saved_connection_mismatch' });
   assert.equal(f.state.requests.length, count);
 });
 
@@ -96,4 +96,24 @@ test('unload drains a pending save so reload restores without a permanent busy e
   assert.equal(f.state.requests.length, 0);
   await main.onPanelInvoke('anywhere.connect', { ...f.config, connectorToken: '', useSaved: true, vaultPassword: f.password });
   await flush(); assert.equal(f.state.requests.length, 1);
+});
+
+test('self-hosted encrypted credentials restore only for the exact chosen origin', async t => {
+  const f = await fixture(t);
+  const c = { ...f.config, serverUrl: 'https://selfhost.example:8443' };
+  await main.onPanelInvoke('anywhere.connect', { ...c, rememberConnection: true, vaultPassword: f.password }); await flush();
+  assert.equal(f.state.requests.at(-1).url, `${c.serverUrl}/api/v2/connector/auth`);
+  await main.onUnload(); await main.onLoad();
+  const status = await main.onPanelInvoke('anywhere.status'); assert.equal(status.serverUrl, c.serverUrl); assert.equal(status.savedConnection.encrypted, true);
+  const before = f.state.requests.length;
+  await assert.rejects(main.onPanelInvoke('anywhere.connect', { ...c, serverUrl: 'https://selfhost.example:9443', useSaved: true, vaultPassword: f.password }), { code: 'saved_connection_mismatch' });
+  assert.equal(f.state.requests.length, before);
+  await main.onPanelInvoke('anywhere.connect', { ...c, connectorToken: '', useSaved: true, vaultPassword: f.password }); await flush();
+  assert.equal(f.state.requests.at(-1).url, `${c.serverUrl}/api/v2/connector/auth`);
+});
+
+test('missing safe-fetch capability blocks persistence and network before connecting', async t => {
+  const f = await fixture(t); delete globalThis.pi.net.getCapabilities;
+  await assert.rejects(main.onPanelInvoke('anywhere.connect', { ...f.config, rememberConnection: true, vaultPassword: f.password }), { code: 'REDIRECT_POLICY_UNAVAILABLE' });
+  assert.equal(f.state.requests.length, 0); assert.equal(f.state.settings.anywhereConnectionV1, undefined);
 });

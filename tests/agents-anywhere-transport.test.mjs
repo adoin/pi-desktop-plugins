@@ -80,7 +80,8 @@ test('loopback HTTP/WS transport authenticates and exchanges current runtime lif
   const port = server.address().port;
   let tcp;
   const pi = { events, net: {
-    fetch: async input => { const res = await fetch(input.url, { method: input.method, headers: input.headers, redirect: 'error' }); return { status: res.status, bodyText: await res.text() }; },
+    getCapabilities: async () => ({ fetchRedirectModes: ['error'] }),
+    fetch: async input => { assert.equal(input.redirect, 'error'); const res = await fetch(input.url, { method: input.method, headers: input.headers, redirect: input.redirect }); return { status: res.status, bodyText: await res.text() }; },
     websocket: {
       connect: input => new Promise((resolve, fail) => {
         const url = new URL(input.url); assert.equal(url.hostname, '127.0.0.1');

@@ -44,7 +44,9 @@ async function fixture() {
       },
     },
     net: {
+      getCapabilities: async () => ({ fetchRedirectModes: ['error'] }),
       fetch: async input => {
+        assert.equal(new URL(input.url).origin, 'https://selfhost.example:8443'); assert.equal(input.redirect, 'error');
         if (input.url.endsWith('/ingest')) { const { notifications } = JSON.parse(input.body); state.notices.push(...notifications); return { status: 200, bodyText: JSON.stringify({ accepted: notifications.length, rejected: [], serverTime: '2026-01-01T00:00:00Z' }) }; }
         return { status: 200, bodyText: JSON.stringify({ accessToken: randomUUID(), expiresIn: 900 }) };
       },
@@ -53,7 +55,7 @@ async function fixture() {
   };
   let timerId = 0;
   const client = new Connector(pi, { random: () => 0, setTimeout: (fn, ms) => { state.timers.set(++timerId, { fn, ms }); return timerId; }, clearTimeout: id => state.timers.delete(id) });
-  const context = { profile: 'current', serverUrl: 'https://web.agents-anywhere.com', connectorId: 'conn_fixture', connectorToken: randomUUID() };
+  const context = { profile: 'current', serverUrl: 'https://selfhost.example:8443', connectorId: 'conn_fixture', connectorToken: randomUUID() };
   const makeService = async () => { const bridge = new PiBridge(pi, await PiBridge.capture(pi)); const service = new SessionService(pi, bridge, context, (method, params) => client.notify(method, params)); await service.initialize(); return service; };
   const service = await makeService(); client.connect(context, service); await client.opening;
   const rpc = async (method, params = {}, id = randomUUID()) => {
