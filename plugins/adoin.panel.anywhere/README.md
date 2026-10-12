@@ -1,6 +1,6 @@
 # Agents Anywhere
 
-Plugin ID: **adoin.panel.anywhere**. Version: **2.2.1**.
+Plugin ID: **adoin.panel.anywhere**. Version: **2.2.2**.
 
 Connect the selected Pi Desktop workspace or saved projects to the current Agents Anywhere
 Connector protocol. Discover sessions, create/send messages, synchronize text
@@ -17,6 +17,12 @@ the scope, confirm connection and session sharing, then connect/apply the change
 One confirmation covers the selected project set; no manual project creation is needed for
 projects that already contain real Pi sessions. Pi's saved-project inventory is
 read locally through `project/list`, not by scanning directories.
+
+Manual project-list refresh preserves the chosen scope and draft selections whose
+IDs and paths still match. Removed/moved roots lose selection; new roots stay
+unselected. Saved scope is restored only during initial panel recovery, never
+over a manual scope choice. A failed refresh clears unverified inventory without
+switching scope. Refresh continues to require fresh local sharing confirmation.
 
 The panel shows at most 200 projects and permits 1–32 selected roots. Saved choices
 are scoped to server/profile/Connector ID and pin both project ID and path. Opening
@@ -237,7 +243,7 @@ send outcomes, inspect Pi locally first.
 From the repository root: `node --test tests/agents-anywhere*.test.mjs`.
 Tests cover real crypto, mocked-host full chat/persistence, negative paths,
 renderer interaction, and loopback transport. They are not production credential
-or installed-host acceptance tests. See `docs/agents-anywhere-release-2.2.1.md`
+or installed-host acceptance tests. See `docs/agents-anywhere-release-2.2.2.md`
 for this version's results, artifact hash, source/package review and publication
 status; older protocol evidence remains in the historical review documents.
 

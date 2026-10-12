@@ -182,7 +182,7 @@
   let queue = Promise.resolve();
   const text = (key) => words[locale][key] || words[locale].unknown;
   const fail = (code) => Object.assign(new Error(code), { code });
-  const PANEL_VERSION = '2.2.1';
+  const PANEL_VERSION = '2.2.2';
   let projects = [], projectInputs = [];
   let selectedProjectIds = new Set();
   let projectsState = 'projectsIdle';
@@ -395,7 +395,7 @@
       if (typeof result.connectorId === 'string' && !$('connectorId').dataset.edited) $('connectorId').value = result.connectorId;
       if (['current', 'legacy'].includes(result.profile) && !$('profile').dataset.edited) $('profile').value = result.profile;
       if (result.savedConnection?.encrypted === true && !['serverUrl', 'connectorId', 'profile', 'connectorToken'].some(id => $(id).dataset.edited)) $('useSaved').checked = true;
-      if (result.savedConnection && $('connectorId').value.trim() && !['serverUrl', 'connectorId', 'profile'].some(id => $(id).dataset.edited)) await loadProjectInventory();
+      if (result.savedConnection && $('connectorId').value.trim() && !['serverUrl', 'connectorId', 'profile'].some(id => $(id).dataset.edited)) await loadProjectInventory(true);
     }
     render();
   }
@@ -469,8 +469,11 @@
     if (busy || closed) return;
     resetSharing(); selectedProjectIds.clear(); message = ''; drawProjects(); render();
   });
-  async function loadProjectInventory() {
-    invalidateProjects(); projectsState = 'projectsLoading'; message = ''; render();
+  async function loadProjectInventory(restoreSaved = false) {
+    const previousScope = $('useProjects').checked;
+    const hadInventory = projectsState === 'projectsLoaded' || projectsState === 'projectsEmpty';
+    const previousSelection = projects.filter(p => selectedProjectIds.has(p.id));
+    projectsState = 'projectsLoading'; message = ''; render();
     const identity = JSON.stringify([$('profile').value, $('serverUrl').value.trim(), $('connectorId').value.trim()]);
     try {
       const result = await invoke('anywhere.projects', {
@@ -483,13 +486,17 @@
           result.projects.some(p => !p || ['id', 'name', 'path'].some(key => typeof p[key] !== 'string' || !p[key] || p[key].length > 8192)) ||
           new Set(result.projects.map(p => p.id)).size !== result.projects.length) throw fail('projects_unavailable');
       projects = result.projects.map(({ id, name, path }) => ({ id, name, path }));
-      // The host restores IDs only when their saved paths still match the inventory.
-      selectedProjectIds = new Set(result.selectedProjectIds.filter(id => projects.some(project => project.id === id)));
-      $('useProjects').checked = result.useProjects;
+      // Manual refresh keeps the user's draft; moved/removed roots lose selection.
+      selectedProjectIds = new Set(!restoreSaved && hadInventory
+        ? projects.filter(p => previousSelection.some(old => old.id === p.id && old.path === p.path)).map(p => p.id)
+        : result.selectedProjectIds.filter(id => projects.some(project => project.id === id)));
+      $('useProjects').checked = restoreSaved ? result.useProjects : previousScope;
       projectsState = projects.length ? 'projectsLoaded' : 'projectsEmpty';
       drawProjects(); resetSharing();
     } catch (error) {
-      if (!closed) { invalidateProjects(); projectsState = 'projects_unavailable'; }
+      if (!closed && identity === JSON.stringify([$('profile').value, $('serverUrl').value.trim(), $('connectorId').value.trim()])) {
+        invalidateProjects(); $('useProjects').checked = previousScope; projectsState = 'projects_unavailable';
+      }
       throw error;
     }
   }

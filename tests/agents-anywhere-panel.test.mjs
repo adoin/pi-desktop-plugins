@@ -237,7 +237,7 @@ test('sharing status and runtime instance are bounded, distinct and excluded fro
   assert.match(n.runtimeSetup.textContent, /save its empty config, then enable it/);
   f.callbacks.get('locale')('zh-CN'); assert.match(n.runtimeSetup.textContent, /保存其空配置/);
   f.callbacks.get('locale')('en'); n.diagnostics.emit('click');
-  assert.match(n.report.value, /Panel: 2\.2\.1\n/); assert.match(n.report.value, /Plugin: 2\.2\.0\n/);
+  assert.match(n.report.value, /Panel: 2\.2\.2\n/); assert.match(n.report.value, /Plugin: 2\.2\.0\n/);
   for (const privateValue of [privatePath, '<workspace>', 'instance-']) assert.ok(!n.report.value.includes(privateValue));
   f.status.runtime.running = true; f.status.sharing = { enabled: false, ready: true, workspaceName: 'not approved', sessionCount: -1, lastSyncAt: privatePath };
   f.intervals.get(1)(); await flush();
@@ -327,7 +327,7 @@ test('horizontal tabs support wrapped arrows, Home and End with roving focus dur
   assert.equal(f.nodes['tab-connections'].emit('keydown', { key: 'Tab' }).defaultPrevented, undefined);
   assert.equal(f.nodes['tab-connections'].emit('keydown', { key: 'Home', ctrlKey: true }).defaultPrevented, undefined);
   assertTab(f, 'connections');
-  f.nodes['tab-events'].emit('click'); f.nodes.diagnostics.emit('click'); assert.match(f.nodes.report.value, /Panel: 2\.2\.1/);
+  f.nodes['tab-events'].emit('click'); f.nodes.diagnostics.emit('click'); assert.match(f.nodes.report.value, /Panel: 2\.2\.2/);
   f.callbacks.get('locale')('zh-CN'); assertTab(f, 'events');
   assert.deepEqual(['status', 'connections', 'events'].map(id => f.nodes[`tab-${id}`].textContent), ['状态', '连接管理', '事件']);
   f.callbacks.get('pagehide')(); f.nodes['tab-status'].emit('click'); assertTab(f, 'events');
@@ -374,7 +374,7 @@ test('projects load only explicitly, restore known IDs without consent, and neve
   const f = fixture(method => method === 'anywhere.projects' ? inventory : undefined); await flush(); const n = f.nodes;
   assert.equal(n.useProjects.checked, false); assert.ok(f.calls.every(c => c.method === 'anywhere.status'));
   n.consent.checked = true; n.shareSessions.checked = true; n.loadProjects.emit('click'); await flush();
-  assert.equal(n.useProjects.checked, true); assert.deepEqual(projectBoxes(n).map(b => b.checked), [false, true, false]);
+  assert.equal(n.useProjects.checked, false); assert.deepEqual(projectBoxes(n).map(b => b.checked), [false, true, false]);
   assert.equal(n.consent.checked, false); assert.equal(n.shareSessions.checked, false);
   assert.match(n.projectsCount.textContent, /^1 \/ 3/);
   assert.deepEqual(Object.keys(f.calls.find(c => c.method === 'anywhere.projects').args).sort(), ['connectorId', 'profile', 'serverUrl']);
@@ -414,7 +414,7 @@ test('identity edits and parser invalidate inventory, while token typing preserv
     assert.equal(n.scopeCurrent.checked, true, id); assert.equal(n.scopeProjects.checked, false, id);
     assert.equal(n.consent.checked, false); assert.equal(n.shareSessions.checked, false);
   }
-  n.loadProjects.emit('click'); await flush(); n.connectorToken.emit('input');
+  n.scopeProjects.checked = true; n.scopeProjects.emit('change'); n.loadProjects.emit('click'); await flush(); n.connectorToken.emit('input');
   assert.equal(n.useProjects.checked, true); assert.equal(projectBoxes(n)[1].checked, true);
   n.parse.emit('click'); assert.equal(n.useProjects.checked, false); assert.equal(n.projectsList.children.length, 0);
   f.callbacks.get('pagehide')();
@@ -463,7 +463,7 @@ test('reloading never selects newly saved projects and explicit sharing reaches 
   assert.equal(f.calls.filter(call => call.method === 'anywhere.connect').length, 1);
   f.callbacks.get('pagehide')();
   const html = readFileSync(new URL('../plugins/adoin.panel.anywhere/renderer/index.html', import.meta.url), 'utf8');
-  assert.match(html, /class="badge">2\.2\.1</);
+  assert.match(html, /class="badge">2\.2\.2</);
 });
 
 test('reopened saved connection restores project choices locally without granting sharing', async () => {
@@ -547,4 +547,27 @@ test('HTML has exactly two visible scope radios and separates scope, sharing and
   assert.ok(html.indexOf('id="scopeCurrent"') < html.indexOf('id="shareSessions"'));
   assert.ok(html.indexOf('id="shareSessions"') < html.indexOf('id="consent"'));
   assert.ok(html.indexOf('id="consent"') < html.indexOf('id="connect"'));
+});
+
+test('manual project refresh preserves draft scope and surviving selections instead of saved preferences', async () => {
+  let inventory = projectInventory(); inventory.useProjects = false;
+  const f = fixture(method => method === 'anywhere.projects' ? inventory : undefined); await flush(); const n = f.nodes;
+  n.scopeProjects.checked = true; n.scopeProjects.emit('change'); n.loadProjects.emit('click'); await flush();
+  assert.equal(n.scopeProjects.checked, true);
+  n.selectAllProjects.emit('click');
+  inventory = { projects: [{id:'project-0',name:'Same',path:'C:/private/project-0'}, {id:'project-1',name:'Moved',path:'C:/moved'}, {id:'new',name:'New',path:'C:/new'}], selectedProjectIds:['new'], useProjects:false };
+  n.loadProjects.emit('click'); await flush();
+  assert.equal(n.scopeProjects.checked, true); assert.deepEqual(projectBoxes(n).map(b => b.checked), [true,false,false]);
+  n.clearProjects.emit('click'); n.loadProjects.emit('click'); await flush();
+  assert.ok(projectBoxes(n).every(b => !b.checked));
+  n.scopeCurrent.checked = true; n.scopeCurrent.emit('change'); inventory.useProjects = true;
+  n.loadProjects.emit('click'); await flush(); assert.equal(n.scopeCurrent.checked, true);
+  f.callbacks.get('pagehide')();
+});
+
+test('failed project refresh keeps selected-project scope but clears unverified inventory', async () => {
+  const f = fixture(method => { if (method === 'anywhere.projects') throw new Error('Unavailable'); }); await flush(); const n = f.nodes;
+  n.scopeProjects.checked = true; n.scopeProjects.emit('change'); n.loadProjects.emit('click'); await flush();
+  assert.equal(n.scopeProjects.checked, true); assert.equal(n.projectsList.children.length, 0);
+  assert.equal(n.consent.checked, false); assert.equal(n.shareSessions.checked, false); f.callbacks.get('pagehide')();
 });
