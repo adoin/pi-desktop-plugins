@@ -9,11 +9,11 @@
       settings: 'Connection settings', command: 'Paste CLI command (parsed only, never executed)',
       parse: 'Parse command', origin: 'Server origin (official or self-hosted HTTPS, optional port)', connectorId: 'Connector ID', token: 'Connector token',
       profile: 'Protocol profile', current: 'Current', legacy: 'Legacy',
-      consent: 'I trust the server origin entered above and allow sending my Connector credentials to it. Sessions are shared only if separately checked below.',
-      shareSessions: 'Share current-workspace paths, titles, user/assistant text, model IDs and status with this server; allow remote create/send/interrupt under existing session permissions. New sessions require local Ask confirmation. Disconnect does not abort accepted turns.',
+      consent: 'I trust the server origin entered above and allow sending my Connector credentials to it. Sharing requires the separate consent above.',
+      shareSessions: 'Share paths, titles, user/assistant text, model IDs and status in the scope selected above with this server; allow remote create/send/interrupt under existing session permissions. New sessions require local Ask confirmation. Disconnect does not abort accepted turns.',
       runtimeId: 'Runtime instance ID', sharingEnabled: 'Session sharing allowed', sharingReady: 'Sharing ready', workspaceName: 'Approved workspace', sessionCount: 'Shared sessions', lastSyncAt: 'Last status sync',
-      runtimeSetup: 'In Anywhere Web/desktop device settings, add the Pi runtime instance, save its empty config, then enable it. Discovery alone does not create an instance.',
-      connect: 'Connect', disconnect: 'Disconnect', boundaries: 'Capabilities and limits',
+      runtimeSetup: 'Device connected, runtime not running. In Anywhere → device, enable the existing Pi Desktop instance. If not configured: Available to add → Pi Desktop → Add, save its empty config, then enable it. First setup only; reconnect normally restores the configured active instance. Connector token cannot create runtime.',
+      connect: 'Connect / apply sharing', disconnect: 'Disconnect', boundaries: 'Capabilities and limits',
       security: 'Requires PI-Desktop 0.18.0+. Approve net.anyHost when installing/updating; it is an arbitrary-host grant, not a per-domain prompt. Enter a trusted direct HTTPS origin without /api/v2 or proxy subpaths. Authentication and uploads refuse redirects; TLS checks remain enabled. No automatic connection after restart.',
       verification: 'Current protocol is tested offline, not Cloud-proven. Legacy v0.1.7 cannot register Pi on its stock server and is disabled. Once locally allowed: session inventory, create/send/interrupt, and final response status sync. Remote tool approval and fine-grained streaming are not supported; local tool permissions may wait for approval locally.',
       logs: 'Connection events', logPrivacy: 'Only recognized event codes and bounded diagnostic details are shown. Credentials and remote error bodies are excluded.',
@@ -41,10 +41,10 @@
       tabStatus: '状态', tabConnections: '连接管理', tabEvents: '事件', connectionSafety: '连接安全', status: '连接状态', refresh: '刷新', discovered: '已发现运行时', running: '运行时正在运行',
       visibility: '套接字在线不代表设备已在 Cloud 中可见。', settings: '连接设置', command: '粘贴 CLI 命令（仅解析，绝不执行）',
       parse: '解析命令', origin: '服务器源地址（官方或自部署 HTTPS，可含端口）', connectorId: '连接器 ID', token: '连接器令牌', profile: '协议配置', current: '当前协议', legacy: '旧版协议',
-      consent: '我信任上方填写的服务器源地址，并允许向它发送连接器凭据。仅在下方另行勾选后才共享会话。', connect: '连接', disconnect: '断开连接', boundaries: '功能与限制',
-      shareSessions: '向此服务器共享当前工作区路径、标题、用户及助手文字、模型标识和状态，并允许按会话现有权限远程创建、发送及中断。新会话需本地确认 Ask 模式。断开不会终止已接收的任务。',
+      consent: '我信任上方填写的服务器源地址，并允许向它发送连接器凭据。共享需在上方另行确认。', connect: '连接／应用共享', disconnect: '断开连接', boundaries: '功能与限制',
+      shareSessions: '向此服务器共享上方所选范围的路径、标题、用户及助手文字、模型标识和状态，并允许按会话现有权限远程创建、发送及中断。新会话需本地确认 Ask 模式。断开不会终止已接收的任务。',
       runtimeId: '运行时实例 ID', sharingEnabled: '已允许会话共享', sharingReady: '共享已就绪', workspaceName: '已授权工作区', sessionCount: '共享会话数', lastSyncAt: '上次状态同步',
-      runtimeSetup: '在 Anywhere 网页端或桌面端的设备设置中添加 Pi 运行时实例，保存其空配置，然后启用。仅发现运行时不会创建实例。',
+      runtimeSetup: '设备已连接，运行时尚未启动。请在 Anywhere → 设备中启用已有 Pi Desktop 实例。尚未配置时：可添加 → Pi Desktop → 添加，保存其空配置，然后启用。添加只需首次完成；正常重连会恢复已配置的活跃实例。连接器令牌不能创建运行时。',
       security: '要求 PI-Desktop 0.18.0+。安装或更新时需批准 net.anyHost 任意主机权限，不会逐域名弹窗。请填写可信的直接 HTTPS 源地址，不含 /api/v2 或代理子路径。认证和上传拒绝重定向，保留 TLS 校验；重启后不会自动连接。',
       verification: '新版仅经过离线测试，尚未通过 Cloud 实测。旧版 v0.1.7 的原版服务端不接受 Pi Runtime，暂不可用。本地授权后支持会话列表、创建、发送、中断及最终回复状态同步。不支持远程工具审批或细粒度流式传输；本地工具权限可能需要在本地等待审批。',
       logs: '连接事件', logPrivacy: '只显示已知事件代码和受限诊断信息，不显示凭据或远端错误正文。',
@@ -139,8 +139,19 @@
   };
   for (const [code, [en, zh]] of Object.entries(storageWords)) { words.en[code] = en; words['zh-CN'][code] = zh; }
   const projectWords = {
-    projectsTitle: ['Saved project sharing', '已保存项目共享'],
-    useProjects: ['Share selected saved projects instead of current workspace', '共享选中的已保存项目，而非当前工作区'],
+    projectsTitle: ['Sharing scope', '共享范围'],
+    scopeCurrent: ['Current workspace', '当前工作区'],
+    scopeProjects: ['Selected saved projects', '选中的已保存项目'],
+    scopeCurrentHelp: ['Saved project selection is inactive in Current workspace scope. You can still load projects; selecting one or Select all switches scope without granting consent.', '当前工作区范围不使用已保存项目选择。仍可加载项目；选择项目或全选会切换范围，但不会授予权限。'],
+    scopeProjectsHelp: ['Only selected saved projects are in scope. Selection alone does not authorize sharing.', '范围仅包含选中的已保存项目。选择项目本身不代表授权共享。'],
+    applyHint: ['Changes take effect only when you connect again. Disconnect to revoke immediately.', '更改仅在重新连接后生效。要立即撤销，请断开连接。'],
+    readinessChecking: ['Checking connection and sharing readiness…', '正在检查连接和共享状态…'],
+    readinessConfigure: ['Not connected — review your target, sharing scope and consent in Connections.', '尚未连接 — 请在连接管理中检查目标、共享范围和授权。'],
+    readinessConnectionOnly: ['Connection only — session sharing is disabled. Review scope and consent, then reconnect to apply sharing.', '仅连接 — 会话共享未启用。请检查范围并授权，然后重新连接以应用共享。'],
+    readinessNotReady: ['Runtime running — sharing is allowed but not ready. Review Status and Events for details.', '运行时已运行 — 已允许共享，但尚未就绪。请查看状态和事件。'],
+    readinessAwaiting: ['Sharing ready — awaiting first status sync. Remote project visibility is not yet verified.', '共享已就绪 — 等待首次状态同步。尚未验证远端项目是否可见。'],
+    readinessActive: ['Status sync active — this does not verify the remote project count or visibility.', '状态同步已活跃 — 这不代表已验证远端项目数量或可见性。'],
+    readinessNetwork: ['Connection failed — review Events for diagnostic details.', '连接失败 — 请在事件中查看诊断信息。'],
     loadProjects: ['Load saved projects', '加载已保存项目'],
     selectAllProjects: ['Select all', '全选'], clearProjects: ['Clear selection', '清空选择'],
     projectsHelp: ['Load local saved projects, then select up to 32. On Connect, with sharing consent, paths, titles and conversation text are uploaded. Empty projects appear remotely only after a real session exists. New projects are not automatically selected. Changes apply only on reconnect; Disconnect to revoke immediately.', '加载本地已保存项目，最多选择 32 个。连接并确认共享后会上传路径、标题和对话文字。空项目仅在存在真实会话后才会显示在远端。新项目不会自动选中。更改仅在重新连接后生效；要立即撤销，请断开连接。'],
@@ -154,8 +165,6 @@
     projects_unavailable: ['Saved projects are unavailable. Reload projects to try again.', '已保存项目不可用。请重新加载项目重试。']
   };
   for (const [code, [en, zh]] of Object.entries(projectWords)) { words.en[code] = en; words['zh-CN'][code] = zh; }
-  words.en.shareSessions = words.en.shareSessions.replace('current-workspace', 'selected-project or current-workspace');
-  words['zh-CN'].shareSessions = words['zh-CN'].shareSessions.replace('当前工作区路径', '所选项目或当前工作区的路径');
   const states = new Set(['unconfigured', 'connecting', 'online', 'reconnecting', 'authentication_failed', 'protocol_incompatible', 'network_error', 'disconnected', 'ownership_conflict']);
   const errorCodes = new Set(['authentication_failed', 'protocol_incompatible', 'network_error', 'ownership_conflict', 'request_failed', 'bridge_unavailable', 'bridge_timeout', 'permission_denied', 'not_found', 'invalid_response', 'consent_required', 'invalid_config', 'invalid_command', 'insecure_origin', 'domain_not_allowed', 'profile_unavailable', 'unsupported', 'unavailable']);
   errorCodes.add('redirect_policy_unavailable'); errorCodes.add('redirect_disallowed');
@@ -173,7 +182,7 @@
   let queue = Promise.resolve();
   const text = (key) => words[locale][key] || words[locale].unknown;
   const fail = (code) => Object.assign(new Error(code), { code });
-  const PANEL_VERSION = '2.2.0';
+  const PANEL_VERSION = '2.2.1';
   let projects = [], projectInputs = [];
   let selectedProjectIds = new Set();
   let projectsState = 'projectsIdle';
@@ -214,6 +223,10 @@
       event.preventDefault();
       selectTab(TAB_IDS[next], { persist: true, focus: true });
     });
+  });
+  $('readinessAction').addEventListener('click', () => {
+    const target = $('readinessAction').dataset.tab;
+    if (!closed && TAB_IDS.includes(target)) selectTab(target, { persist: true, focus: true });
   });
   const localLogs = [];
   const events = new Set(['panel_ready', 'bridge_request', 'bridge_failure', 'status_received', 'panel_error', 'form_invalid', 'plugin_loaded', 'connect_received', 'configuration_rejected', 'protocol', 'auth_request', 'auth_http', 'websocket_connect', 'websocket_open', 'rpc', 'retry_scheduled', ...states]);
@@ -280,6 +293,7 @@
     $('diagnostics').disabled = closed;
     // Navigation remains usable while polling or connecting, including diagnostics.
     for (const id of TAB_IDS) $(`tab-${id}`).disabled = closed;
+    $('readinessAction').disabled = closed;
     $('parse').disabled = closed || editingLocked;
     // Keep status polling from disrupting typing; freeze fields only during user actions.
     $('connect').disabled = busy || closed || !$('consent').checked || !status ||
@@ -293,6 +307,11 @@
     $('vaultPassword').required = useSaved || $('rememberConnection').checked;
     $('forgetConnection').disabled = busy || closed || !$('forgetConsent').checked;
     $('useProjects').disabled = editingLocked || closed;
+    for (const id of ['scopeCurrent', 'scopeProjects']) $(id).disabled = editingLocked || closed;
+    $('scopeCurrent').checked = !$('useProjects').checked;
+    $('scopeProjects').checked = $('useProjects').checked;
+    $('scopeHelp').textContent = text($('useProjects').checked ? 'scopeProjectsHelp' : 'scopeCurrentHelp');
+    $('projectsList').dataset.inactive = String(!$('useProjects').checked);
     $('selectAllProjects').disabled = busy || closed || !projects.length;
     $('clearProjects').disabled = busy || closed || !selectedProjectIds.size;
     projectInputs.forEach(input => { input.disabled = editingLocked || closed; });
@@ -326,6 +345,19 @@
       $(id).dataset.active = String(value === true);
     }
     if ($('runtimeSetup')) $('runtimeSetup').hidden = !(status?.state === 'online' && !status?.runtime?.running);
+    const online = status?.state === 'online';
+    const setup = online && !status?.runtime?.running;
+    const networkFailure = ['network_error', 'authentication_failed', 'protocol_incompatible', 'ownership_conflict'].includes(status?.state);
+    const readinessKey = !status ? 'readinessChecking' : networkFailure ? 'readinessNetwork' : !online ? 'readinessConfigure' :
+      sharing?.enabled !== true ? 'readinessConnectionOnly' : sharing?.ready !== true ? 'readinessNotReady' :
+      values.lastSyncAt === '—' ? 'readinessAwaiting' : 'readinessActive';
+    $('readinessMessage').hidden = setup;
+    $('readinessMessage').textContent = text(readinessKey);
+    $('readiness').dataset.state = setup ? 'setup' : readinessKey;
+    const readinessTarget = networkFailure ? 'events' : (!online || sharing?.enabled !== true) ? 'connections' : '';
+    $('readinessAction').hidden = !readinessTarget;
+    $('readinessAction').dataset.tab = readinessTarget;
+    $('readinessAction').textContent = text(readinessTarget === 'events' ? 'tabEvents' : 'tabConnections');
     $('savedState').textContent = status?.savedConnectionError ? text(errorCodes.has(status.savedConnectionError) ? status.savedConnectionError : 'persistence_failed') : text(status?.savedConnection?.encrypted ? 'savedEncrypted' : status?.savedConnection ? 'savedMetadata' : 'savedNone');
     for (const option of $('profile').options) {
       const entry = status?.profiles?.find((item) => item?.id === option.value);
@@ -408,6 +440,7 @@
       input.addEventListener('change', () => {
         if (closed || editingLocked) return;
         resetSharing(); message = '';
+        if (input.checked) $('useProjects').checked = true;
         if (input.checked && selectedProjectIds.size >= 32) { input.checked = false; message = 'project_selection_invalid'; }
         else if (input.checked) selectedProjectIds.add(project.id);
         else selectedProjectIds.delete(project.id);
@@ -417,9 +450,17 @@
     });
   }
   $('useProjects').addEventListener('change', () => { resetSharing(); controls(); });
+  for (const [id, useProjects] of [['scopeCurrent', false], ['scopeProjects', true]]) {
+    $(id).addEventListener('change', () => {
+      if (closed || editingLocked || !$(id).checked) return;
+      $('useProjects').checked = useProjects;
+      resetSharing(); controls();
+    });
+  }
   $('selectAllProjects').addEventListener('click', () => {
     if (busy || closed) return;
     resetSharing(); message = '';
+    $('useProjects').checked = true;
     if (projects.length > 32) message = 'project_selection_invalid';
     else selectedProjectIds = new Set(projects.map(project => project.id));
     drawProjects(); render();

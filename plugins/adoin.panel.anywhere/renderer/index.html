@@ -15,13 +15,20 @@
   <main>
     <header>
       <div class="brand"><span class="brandmark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M12 10l-4 4a6 6 0 008 8l4-4M20 22l4-4a6 6 0 00-8-8l-4 4M12 20l8-8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg></span><h1>Agents Anywhere</h1></div>
-      <span class="badge">2.2.0</span>
+      <span class="badge">2.2.1</span>
     </header>
     <nav class="tabs" role="tablist" aria-label="Anywhere" aria-orientation="horizontal">
       <button id="tab-status" type="button" role="tab" aria-selected="true" aria-controls="panel-status" tabindex="0" data-i18n="tabStatus">Status</button>
       <button id="tab-connections" type="button" role="tab" aria-selected="false" aria-controls="panel-connections" tabindex="-1" data-i18n="tabConnections">Connections</button>
       <button id="tab-events" type="button" role="tab" aria-selected="false" aria-controls="panel-events" tabindex="-1" data-i18n="tabEvents">Events</button>
     </nav>
+    <aside id="readiness" class="card readiness" aria-label="Sharing readiness">
+      <div role="status" aria-live="polite">
+        <p id="runtimeSetup" data-i18n="runtimeSetup" hidden>Device connected, runtime not running. In Anywhere → device, enable the existing Pi Desktop instance. If not configured: Available to add → Pi Desktop → Add, save its empty config, then enable it. First setup only; reconnect normally restores the configured active instance. Connector token cannot create runtime.</p>
+        <p id="readinessMessage">Checking connection and sharing readiness…</p>
+      </div>
+      <button id="readinessAction" type="button" hidden></button>
+    </aside>
     <div id="panel-status" role="tabpanel" aria-labelledby="tab-status" tabindex="0">
     <section class="card status-card" aria-labelledby="status-title">
       <div class="row"><h2 id="status-title" data-i18n="status">Connection status</h2><button id="refresh" type="button" data-i18n="refresh">Refresh</button></div>
@@ -35,7 +42,6 @@
         <div class="metric"><dt data-i18n="sessionCount">Shared sessions</dt><dd id="sessionCount">—</dd></div>
         <div class="metric"><dt data-i18n="lastSyncAt">Last status sync</dt><dd id="lastSyncAt">—</dd></div>
       </dl>
-      <p id="runtimeSetup" data-i18n="runtimeSetup" hidden>In Anywhere Web/desktop device settings, add the Pi runtime instance, save its empty config, then enable it. Discovery alone does not create an instance.</p>
       <p data-i18n="visibility">An online socket does not prove device visibility in Cloud.</p>
     </section>
       <aside class="card notes"><h2 data-i18n="boundaries">Capabilities and limits</h2><p data-i18n="verification">Current protocol is tested offline, not Cloud-proven. Legacy is disabled. Remote tool approval and fine-grained streaming are not supported; local permissions still apply.</p></aside>
@@ -64,8 +70,13 @@
         <button id="forgetConnection" type="button" data-i18n="forgetConnection" disabled>Forget saved connection</button>
       </fieldset>
       <fieldset class="saved-connection project-scope" aria-describedby="projectsHelp">
-        <legend data-i18n="projectsTitle">Saved project sharing</legend>
-        <label class="consent"><input id="useProjects" type="checkbox" /><span data-i18n="useProjects">Share selected saved projects instead of current workspace</span></label>
+        <legend data-i18n="projectsTitle">Sharing scope</legend>
+        <input id="useProjects" type="checkbox" hidden aria-hidden="true" tabindex="-1" />
+        <div class="scope-options">
+          <label class="scope-option"><input id="scopeCurrent" type="radio" name="sharingScope" value="current" checked /><span data-i18n="scopeCurrent">Current workspace</span></label>
+          <label class="scope-option"><input id="scopeProjects" type="radio" name="sharingScope" value="projects" /><span data-i18n="scopeProjects">Selected saved projects</span></label>
+        </div>
+        <p id="scopeHelp"></p>
         <p id="projectsHelp" data-i18n="projectsHelp">Load local saved projects, then select up to 32. On Connect, with sharing consent, paths, titles and conversation text are uploaded. Empty projects appear remotely only after a real session exists. New projects are not automatically selected. Changes apply only on reconnect; Disconnect to revoke immediately.</p>
         <div class="actions project-actions">
           <button id="loadProjects" type="button" data-i18n="loadProjects">Load saved projects</button>
@@ -76,9 +87,10 @@
         <p id="projectsCount" role="status" aria-live="polite"></p>
         <div id="projectsList" class="project-list"></div>
       </fieldset>
-      <label class="consent"><input id="consent" type="checkbox" /><span data-i18n="consent">I trust the server origin entered above and allow sending my Connector credentials to it. Sessions are shared only if separately checked below.</span></label>
-      <label class="consent"><input id="shareSessions" type="checkbox" /><span data-i18n="shareSessions">Share sessions in the currently open workspace and allow remote create/send/interrupt. Conversation text will be sent to this server; Pi local tool permissions still apply.</span></label>
-      <div class="actions"><button id="connect" type="submit" data-i18n="connect" disabled>Connect</button><button id="disconnect" type="button" data-i18n="disconnect">Disconnect</button></div>
+      <label class="consent"><input id="shareSessions" type="checkbox" /><span data-i18n="shareSessions">Share paths, titles and conversation text in the scope selected above; allow remote create/send/interrupt under existing session permissions.</span></label>
+      <p data-i18n="applyHint">Changes take effect only when you connect again. Disconnect to revoke immediately.</p>
+      <label class="consent"><input id="consent" type="checkbox" /><span data-i18n="consent">I trust the server origin entered above and allow sending my Connector credentials to it. Sharing requires the separate consent above.</span></label>
+      <div class="actions"><button id="connect" type="submit" data-i18n="connect" disabled>Connect / apply sharing</button><button id="disconnect" type="button" data-i18n="disconnect">Disconnect</button></div>
       <p id="message" role="alert"></p>
     </form>
       <aside class="card notes"><h2 data-i18n="connectionSafety">Connection safety</h2><p data-i18n="security">Requires PI-Desktop 0.18.0+. Approve net.anyHost when installing/updating; it is an arbitrary-host grant, not a per-domain prompt. Enter a trusted direct HTTPS origin without /api/v2 or proxy subpaths. Authentication and uploads refuse redirects; TLS checks remain enabled. No automatic connection after restart.</p></aside>

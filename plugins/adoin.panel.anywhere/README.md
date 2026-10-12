@@ -1,6 +1,6 @@
 # Agents Anywhere
 
-Plugin ID: **adoin.panel.anywhere**. Version: **2.2.0**.
+Plugin ID: **adoin.panel.anywhere**. Version: **2.2.1**.
 
 Connect the selected Pi Desktop workspace or saved projects to the current Agents Anywhere
 Connector protocol. Discover sessions, create/send messages, synchronize text
@@ -8,12 +8,13 @@ replies and status, interrupt turns, and reconnect with durable request dedup.
 Supports official Cloud and compatible self-hosted HTTPS origins. Publication
 approval remains separate from the version label; legacy support is unchanged.
 
-## Batch project sharing (2.2.0)
+## Sharing scope
 
-In Connections, load the saved Pi projects, select all or choose specific rows,
-and enable **Share selected saved projects instead of current workspace**. Then
-confirm connection and session sharing and reconnect. One confirmation covers
-the selected project set; no manual project creation in Anywhere is needed for
+In Connections, choose **Current workspace** or **Selected projects**. Loading
+projects does not enable sharing; choosing a project or Select all automatically
+sets Selected projects scope. There is no separate batch-enable checkbox. Review
+the scope, confirm connection and session sharing, then connect/apply the changes.
+One confirmation covers the selected project set; no manual project creation is needed for
 projects that already contain real Pi sessions. Pi's saved-project inventory is
 read locally through `project/list`, not by scanning directories.
 
@@ -45,6 +46,27 @@ passes. Deselecting projects never deletes already uploaded remote history or
 aborts accepted turns. Without batch mode, the existing current-workspace-only
 behavior remains unchanged. Choices persist in `anywhereProjectSelectionV1` (up
 to 16 server/Connector scopes); no token or transcript is stored in this setting.
+
+## Runtime setup and readiness
+
+The banner above all three tabs separates device connectivity from Runtime setup
+and actual synchronization. An online device with no running instance still needs
+one action in Anywhere: open the device, find Pi Desktop under Available to add,
+add it, save the empty configuration and enable it. If already configured but
+stopped, enable the existing instance rather than creating another. A configured
+active instance is normally restored by the server after reconnect.
+
+The plugin cannot create this instance using Connector credentials: upstream
+`POST /connectors/{connector_id}/runtimes` depends on `current_user_id` and
+`verify_user_access_token`, requiring a logged-in Anywhere user. No browser
+cookies, user login tokens or credential impersonation are used by this plugin.
+Automatic first-time provisioning would require an explicitly supported server
+onboarding API or a separately authorized user-login flow; neither is added here.
+
+The banner also distinguishes connection-only mode, sharing not ready, waiting
+for first synchronization and active synchronization. A socket opening never
+implies that projects have appeared on the remote client. Changing the selected
+scope still requires reconnect/apply; disconnect to revoke sharing immediately.
 
 ## Self-hosted setup (2.1.0)
 
@@ -215,7 +237,7 @@ send outcomes, inspect Pi locally first.
 From the repository root: `node --test tests/agents-anywhere*.test.mjs`.
 Tests cover real crypto, mocked-host full chat/persistence, negative paths,
 renderer interaction, and loopback transport. They are not production credential
-or installed-host acceptance tests. See `docs/agents-anywhere-release-2.2.0.md`
+or installed-host acceptance tests. See `docs/agents-anywhere-release-2.2.1.md`
 for this version's results, artifact hash, source/package review and publication
 status; older protocol evidence remains in the historical review documents.
 

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "adoin.panel.anywhere",
   "name": "Agents Anywhere",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "Connect workspace chat to official or self-hosted Agents Anywhere with explicit consent, encrypted credentials and host-enforced redirect refusal.",
   "i18n": {
     "en": {
@@ -19,7 +19,7 @@
   "author": "PI-Desktop Plugin Contributors",
   "main": "main.js",
   "categories": ["productivity"],
-  "changelog": "2.2.0: add local project inventory, batch selection/select-all and per-server remembered project choices. Share approved projects through isolated native bridges and session stores; automatically associate projects through real session metadata. Reject removed/moved/unselected project access, retain current-workspace mode, and do not invent sessions for empty projects. Permissions unchanged.",
+  "changelog": "2.2.1: replace the ambiguous batch checkbox with explicit Current workspace / Selected projects scope controls. Selecting projects enables the matching scope without granting sharing consent. Show setup/readiness guidance across tabs, distinguishing connected device, runtime startup and first synchronization. Runtime creation remains a user-authenticated action in Anywhere. Permissions and backend protocol unchanged.",
   "permissions": ["ui.panel", "ui.view", "net.fetch", "net.websocket", "background.service", "desktop.control", "models.list", "net.anyHost"],
   "net": { "domains": ["web.agents-anywhere.com"] },
   "engines": { "piDesktop": ">=0.18.0" },

@@ -100,8 +100,8 @@ dd[data-active="true"] { color: var(--success); }
 .settings-card > h2::before { content: ""; width: 4px; height: 15px; border-radius: 3px; background: var(--accent); }
 label { display: block; margin: 13px 0 7px; color: var(--muted); font-size: 12px; font-weight: 550; }
 input, textarea, select, button { font: inherit; color: var(--fg); background: var(--field); border: 1px solid var(--border); border-radius: 9px; transition: border-color .16s, background-color .16s, box-shadow .16s; }
-input:not([type="checkbox"]), textarea, select { width: 100%; min-width: 0; padding: 10px 12px; }
-input:not([type="checkbox"]):hover, textarea:hover, select:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
+input:not([type="checkbox"]):not([type="radio"]), textarea, select { width: 100%; min-width: 0; padding: 10px 12px; }
+input:not([type="checkbox"]):not([type="radio"]):hover, textarea:hover, select:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
 textarea { resize: vertical; min-height: 94px; font-family: ui-monospace, Consolas, monospace; font-size: 12px; line-height: 1.6; background: linear-gradient(135deg, var(--field), var(--surface)); }
 button { padding: 9px 16px; min-height: 38px; cursor: pointer; font-size: 12px; font-weight: 600; }
 button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-strong); background: var(--accent-soft); }
@@ -160,3 +160,19 @@ button:disabled { opacity: .48; cursor: not-allowed; }
 .project-option:hover { border-color: var(--accent); }
 .project-option:has(input:disabled) { opacity: .6; cursor: not-allowed; }
 #projectsCount { color: var(--accent); font-variant-numeric: tabular-nums; }
+.readiness { padding: 16px 20px; border-left: 4px solid var(--accent); }
+.readiness p { margin: 0; color: var(--fg); }
+.readiness button { margin-top: 12px; }
+.readiness[data-state="setup"] { background: var(--note-bg); border-color: var(--note-border); }
+.readiness[data-state="setup"] p { color: var(--note-fg); font-weight: 600; }
+.readiness[data-state="readinessNetwork"] { border-left-color: var(--danger); }
+.readiness #runtimeSetup { border: 0; padding: 0; }
+.scope-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 8px; }
+.scope-option { display: flex; align-items: flex-start; gap: 8px; min-width: 0; margin: 0; padding: 12px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.scope-option span { min-width: 0; overflow-wrap: anywhere; }
+.scope-option input { width: 16px; height: 16px; flex: 0 0 16px; margin: 2px 0 0; accent-color: var(--accent); }
+.scope-option:has(input:checked) { color: var(--fg); background: var(--accent-soft); border-color: var(--accent); }
+.scope-option:hover { border-color: var(--accent); }
+#scopeHelp { color: var(--fg); }
+.project-list[data-inactive="true"] .project-option { border-style: dashed; background: transparent; }
+.project-list[data-inactive="true"] .project-option:has(input:checked) { border-color: var(--border); }

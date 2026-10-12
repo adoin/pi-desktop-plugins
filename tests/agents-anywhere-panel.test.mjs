@@ -20,14 +20,15 @@ function fixture(override, options = {}) {
   ids.push('shareSessions', 'runtimeId', 'sharingEnabled', 'sharingReady', 'workspaceName', 'sessionCount', 'lastSyncAt', 'runtimeSetup');
   ids.push('useSaved', 'rememberConnection', 'vaultPassword', 'savedState', 'forgetConsent', 'forgetConnection');
   ids.push('useProjects', 'loadProjects', 'selectAllProjects', 'clearProjects', 'projectsList', 'projectsCount', 'projectsState');
+  ids.push('scopeCurrent', 'scopeProjects', 'scopeHelp', 'readiness', 'readinessMessage', 'readinessAction');
   const tabs = ['status', 'connections', 'events'];
   ids.push(...tabs.flatMap(id => [`tab-${id}`, `panel-${id}`]));
   const nodes = Object.fromEntries(ids.map(id => [id, new Element()]));
   nodes.profile.value = 'current'; nodes.profile.options = [new Element('current'), new Element('legacy')];
   Object.defineProperty(nodes.profile, 'selectedOptions', { get: () => nodes.profile.options.filter(option => option.value === nodes.profile.value) });
-  const fields = ['useProjects', 'consent', 'shareSessions', 'profile', 'serverUrl', 'connectorId', 'connectorToken', 'command', 'useSaved', 'rememberConnection', 'vaultPassword', 'forgetConsent'].map(id => nodes[id]);
+  const fields = ['scopeCurrent', 'scopeProjects', 'useProjects', 'consent', 'shareSessions', 'profile', 'serverUrl', 'connectorId', 'connectorToken', 'command', 'useSaved', 'rememberConnection', 'vaultPassword', 'forgetConsent'].map(id => nodes[id]);
   nodes.connection.querySelectorAll = () => fields;
-  const buttons = ['loadProjects', 'selectAllProjects', 'clearProjects', 'connect', 'disconnect', 'parse', 'refresh', 'diagnostics', 'forgetConnection', ...tabs.map(id => `tab-${id}`)].map(id => nodes[id]);
+  const buttons = ['readinessAction', 'loadProjects', 'selectAllProjects', 'clearProjects', 'connect', 'disconnect', 'parse', 'refresh', 'diagnostics', 'forgetConnection', ...tabs.map(id => `tab-${id}`)].map(id => nodes[id]);
   for (const [index, id] of tabs.entries()) nodes[`tab-${id}`].dataset.i18n = ['tabStatus', 'tabConnections', 'tabEvents'][index];
   for (const id of ['connect', 'disconnect', 'parse', 'refresh']) nodes[id].dataset.i18n = id;
   nodes.runtimeSetup.dataset.i18n = 'runtimeSetup';
@@ -98,7 +99,7 @@ test('host locale changes translate controls, profiles, logs and known errors wi
   f.status.logs = [{ event: 'auth_http', detail: '401' }]; f.intervals.get(1)(); await flush();
   f.nodes.connectorToken.value = randomUUID(); const token = f.nodes.connectorToken.value;
   f.callbacks.get('locale')('zh-CN');
-  assert.equal(f.nodes.connect.textContent, '连接');
+  assert.equal(f.nodes.connect.textContent, '连接／应用共享');
   assert.equal(f.nodes.profile.options[0].textContent, '新版（默认）');
   assert.match(f.nodes.profile.options[1].textContent, /不支持 Pi/);
   assert.ok(f.nodes.logs.children.some(node => /身份验证 HTTP 状态.*401/.test(node.textContent)));
@@ -106,7 +107,7 @@ test('host locale changes translate controls, profiles, logs and known errors wi
   f.nodes.command.value = '--server-url "unclosed'; f.nodes.parse.emit('click'); await flush();
   assert.match(f.nodes.message.textContent, /无法解析命令/);
   f.callbacks.get('locale')('en');
-  assert.equal(f.nodes.connect.textContent, 'Connect');
+  assert.equal(f.nodes.connect.textContent, 'Connect / apply sharing');
   assert.equal(f.nodes.profile.options[0].textContent, 'Current (default)');
   assert.match(f.nodes.message.textContent, /Cannot parse the command/);
   assert.ok(f.nodes.logs.children.some(node => /Authentication HTTP status.*401/.test(node.textContent)));
@@ -236,7 +237,7 @@ test('sharing status and runtime instance are bounded, distinct and excluded fro
   assert.match(n.runtimeSetup.textContent, /save its empty config, then enable it/);
   f.callbacks.get('locale')('zh-CN'); assert.match(n.runtimeSetup.textContent, /保存其空配置/);
   f.callbacks.get('locale')('en'); n.diagnostics.emit('click');
-  assert.match(n.report.value, /Panel: 2\.2\.0\n/); assert.match(n.report.value, /Plugin: 2\.2\.0\n/);
+  assert.match(n.report.value, /Panel: 2\.2\.1\n/); assert.match(n.report.value, /Plugin: 2\.2\.0\n/);
   for (const privateValue of [privatePath, '<workspace>', 'instance-']) assert.ok(!n.report.value.includes(privateValue));
   f.status.runtime.running = true; f.status.sharing = { enabled: false, ready: true, workspaceName: 'not approved', sessionCount: -1, lastSyncAt: privatePath };
   f.intervals.get(1)(); await flush();
@@ -326,7 +327,7 @@ test('horizontal tabs support wrapped arrows, Home and End with roving focus dur
   assert.equal(f.nodes['tab-connections'].emit('keydown', { key: 'Tab' }).defaultPrevented, undefined);
   assert.equal(f.nodes['tab-connections'].emit('keydown', { key: 'Home', ctrlKey: true }).defaultPrevented, undefined);
   assertTab(f, 'connections');
-  f.nodes['tab-events'].emit('click'); f.nodes.diagnostics.emit('click'); assert.match(f.nodes.report.value, /Panel: 2\.2\.0/);
+  f.nodes['tab-events'].emit('click'); f.nodes.diagnostics.emit('click'); assert.match(f.nodes.report.value, /Panel: 2\.2\.1/);
   f.callbacks.get('locale')('zh-CN'); assertTab(f, 'events');
   assert.deepEqual(['status', 'connections', 'events'].map(id => f.nodes[`tab-${id}`].textContent), ['状态', '连接管理', '事件']);
   f.callbacks.get('pagehide')(); f.nodes['tab-status'].emit('click'); assertTab(f, 'events');
@@ -395,12 +396,12 @@ test('bulk and individual project scope edits reset both grants; connect sends I
   n.consent.checked = true; n.shareSessions.checked = true;
   const box = projectBoxes(n)[0]; box.checked = false; box.emit('change');
   assert.equal(n.consent.checked, false); assert.equal(n.shareSessions.checked, false);
-  n.useProjects.checked = false; n.useProjects.emit('change'); n.consent.checked = true; n.connection.emit('submit'); await flush();
+  n.scopeCurrent.checked = true; n.scopeCurrent.emit('change'); n.consent.checked = true; n.connection.emit('submit'); await flush();
   args = f.calls.filter(c => c.method === 'anywhere.connect').at(-1).args;
   assert.equal(args.useProjects, false); assert.equal(args.projectIds.length, 0);
   n.consent.checked = true; n.shareSessions.checked = true; n.clearProjects.emit('click');
   assert.equal(n.consent.checked, false); assert.equal(n.shareSessions.checked, false); assert.ok(projectBoxes(n).every(b => !b.checked));
-  n.useProjects.checked = true; n.useProjects.emit('change'); n.consent.checked = true;
+  n.scopeProjects.checked = true; n.scopeProjects.emit('change'); n.consent.checked = true;
   const before = f.calls.length; n.connection.emit('submit'); await flush();
   assert.equal(f.calls.length, before); assert.match(n.message.textContent, /project_selection_invalid/);
   f.callbacks.get('pagehide')();
@@ -410,6 +411,7 @@ test('identity edits and parser invalidate inventory, while token typing preserv
   for (const id of ['serverUrl', 'connectorId', 'profile', 'command']) {
     n.loadProjects.emit('click'); await flush(); n.consent.checked = true; n.shareSessions.checked = true; n[id].emit('input');
     assert.equal(n.useProjects.checked, false, id); assert.equal(n.projectsList.children.length, 0, id);
+    assert.equal(n.scopeCurrent.checked, true, id); assert.equal(n.scopeProjects.checked, false, id);
     assert.equal(n.consent.checked, false); assert.equal(n.shareSessions.checked, false);
   }
   n.loadProjects.emit('click'); await flush(); n.connectorToken.emit('input');
@@ -461,7 +463,7 @@ test('reloading never selects newly saved projects and explicit sharing reaches 
   assert.equal(f.calls.filter(call => call.method === 'anywhere.connect').length, 1);
   f.callbacks.get('pagehide')();
   const html = readFileSync(new URL('../plugins/adoin.panel.anywhere/renderer/index.html', import.meta.url), 'utf8');
-  assert.match(html, /class="badge">2\.2\.0</);
+  assert.match(html, /class="badge">2\.2\.1</);
 });
 
 test('reopened saved connection restores project choices locally without granting sharing', async () => {
@@ -476,4 +478,73 @@ test('reopened saved connection restores project choices locally without grantin
   assert.equal(f.nodes.consent.checked,false); assert.equal(f.nodes.shareSessions.checked,false);
   assert.ok(f.calls.every(c=>['anywhere.status','anywhere.projects'].includes(c.method)));
   f.callbacks.get('pagehide')();
+});
+
+test('visible scope radios and select all switch scope without granting either consent', async () => {
+  const inventory = { ...projectInventory(), selectedProjectIds: [], useProjects: false };
+  const f = fixture(method => method === 'anywhere.projects' ? inventory : undefined); await flush(); const n = f.nodes;
+  assert.equal(n.scopeCurrent.checked, true); assert.equal(n.scopeProjects.checked, false);
+  assert.equal(n.loadProjects.disabled, false);
+  n.loadProjects.emit('click'); await flush();
+  assert.equal(n.projectsList.dataset.inactive, 'true'); assert.match(n.scopeHelp.textContent, /inactive/);
+  assert.equal(n.selectAllProjects.disabled, false); assert.ok(projectBoxes(n).every(box => !box.disabled));
+  n.consent.checked = true; n.shareSessions.checked = true; n.selectAllProjects.emit('click');
+  assert.equal(n.scopeCurrent.checked, false); assert.equal(n.scopeProjects.checked, true); assert.equal(n.useProjects.checked, true);
+  assert.equal(n.consent.checked, false); assert.equal(n.shareSessions.checked, false);
+  assert.equal(n.projectsList.dataset.inactive, 'false'); assert.ok(projectBoxes(n).every(box => box.checked));
+  assert.ok(!f.calls.some(call => call.method === 'anywhere.connect'));
+  n.scopeCurrent.checked = true; n.scopeCurrent.emit('change');
+  assert.equal(n.scopeProjects.checked, false); assert.ok(projectBoxes(n).every(box => box.checked));
+  n.consent.checked = true; n.connection.emit('submit'); await flush();
+  const args = f.calls.find(call => call.method === 'anywhere.connect').args;
+  assert.equal(args.useProjects, false); assert.equal(args.projectIds.length, 0); assert.equal(args.shareSessions, false);
+  n.clearProjects.emit('click');
+  const box = projectBoxes(n)[0]; n.consent.checked = true; n.shareSessions.checked = true; box.checked = true; box.emit('change');
+  assert.equal(n.scopeProjects.checked, true); assert.equal(n.scopeCurrent.checked, false);
+  assert.equal(n.consent.checked, false); assert.equal(n.shareSessions.checked, false);
+  n.connectorToken.emit('input'); assert.equal(n.scopeProjects.checked, true); assert.equal(box.checked, true);
+  f.callbacks.get('pagehide')();
+});
+
+test('readiness stays outside tabs and follows runtime.start through first sync without claiming remote visibility', async () => {
+  const html = readFileSync(new URL('../plugins/adoin.panel.anywhere/renderer/index.html', import.meta.url), 'utf8');
+  assert.match(html, /<\/nav>\s*<aside id="readiness"[\s\S]*?<\/aside>\s*<div id="panel-status"/);
+  assert.equal([...html.matchAll(/id="runtimeSetup"/g)].length, 1);
+  const f = fixture(); await flush(); const n = f.nodes;
+  assert.match(n.readinessMessage.textContent, /Not connected/);
+  n.readinessAction.emit('click'); assertTab(f, 'connections'); assert.equal(n['tab-connections'].focused, true);
+  f.status.state = 'online'; f.status.runtime = { discovered: true, running: false }; f.status.sharing = { enabled: true, ready: false };
+  f.intervals.get(1)(); await flush();
+  for (const tab of ['status', 'connections', 'events']) {
+    n[`tab-${tab}`].emit('click'); assertTab(f, tab);
+    assert.equal(n.runtimeSetup.hidden, false); assert.equal(n.readinessMessage.hidden, true);
+    assert.match(n.runtimeSetup.textContent, /Device connected.*Pi Desktop.*Available to add.*First setup only.*Connector token cannot create runtime/);
+  }
+  f.status.logs = [{ event: 'rpc', detail: 'runtime.start:ok' }];
+  f.status.runtime.running = true; f.status.sharing.enabled = false;
+  f.intervals.get(1)(); await flush();
+  assert.equal(n.runtimeSetup.hidden, true); assert.equal(n.readinessMessage.hidden, false);
+  assert.match(n.readinessMessage.textContent, /Connection only.*disabled/);
+  assert.equal(n.readinessAction.dataset.tab, 'connections');
+  f.status.sharing.enabled = true; f.intervals.get(1)(); await flush();
+  assert.match(n.readinessMessage.textContent, /not ready/);
+  f.status.sharing.ready = true; f.intervals.get(1)(); await flush();
+  assert.match(n.readinessMessage.textContent, /awaiting first status sync/);
+  f.status.sharing.lastSyncAt = '2026-01-01T00:00:00.000Z'; f.intervals.get(1)(); await flush();
+  assert.match(n.readinessMessage.textContent, /sync active.*does not verify the remote project count/);
+  f.callbacks.get('locale')('zh-CN'); assert.match(n.readinessMessage.textContent, /同步已活跃/);
+  f.status.state = 'network_error'; f.intervals.get(1)(); await flush();
+  assert.equal(n.readinessAction.hidden, false); assert.equal(n.readinessAction.dataset.tab, 'events');
+  n.readinessAction.emit('click'); assertTab(f, 'events');
+  assert.ok(f.calls.every(call => call.method === 'anywhere.status'));
+  f.callbacks.get('pagehide')();
+});
+
+test('HTML has exactly two visible scope radios and separates scope, sharing and connection consent', () => {
+  const html = readFileSync(new URL('../plugins/adoin.panel.anywhere/renderer/index.html', import.meta.url), 'utf8');
+  assert.equal([...html.matchAll(/type="radio" name="sharingScope"/g)].length, 2);
+  assert.match(html, /id="useProjects"[^>]*hidden[^>]*tabindex="-1"/);
+  assert.ok(html.indexOf('id="scopeCurrent"') < html.indexOf('id="shareSessions"'));
+  assert.ok(html.indexOf('id="shareSessions"') < html.indexOf('id="consent"'));
+  assert.ok(html.indexOf('id="consent"') < html.indexOf('id="connect"'));
 });
