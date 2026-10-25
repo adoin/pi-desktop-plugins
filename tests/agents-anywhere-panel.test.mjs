@@ -18,7 +18,7 @@ class Element {
 function fixture(override, options = {}) {
   const ids = ['connect', 'disconnect', 'parse', 'refresh', 'diagnostics', 'report', 'consent', 'connection', 'profile', 'message', 'logs', 'state', 'discovered', 'running', 'serverUrl', 'connectorId', 'connectorToken', 'command'];
   ids.push('shareSessions', 'runtimeId', 'sharingEnabled', 'sharingReady', 'workspaceName', 'sessionCount', 'lastSyncAt', 'runtimeSetup');
-  ids.push('useSaved', 'rememberConnection', 'vaultPassword', 'savedState', 'forgetConsent', 'forgetConnection');
+  ids.push('useSaved', 'rememberConnection', 'vaultPassword', 'savedState', 'forgetConsent', 'forgetConnection', 'useLocal', 'autoReconnect');
   ids.push('useProjects', 'loadProjects', 'selectAllProjects', 'clearProjects', 'projectsList', 'projectsCount', 'projectsState');
   ids.push('scopeCurrent', 'scopeProjects', 'scopeHelp', 'readiness', 'readinessMessage', 'readinessAction');
   const tabs = ['status', 'connections', 'events'];
@@ -570,4 +570,25 @@ test('failed project refresh keeps selected-project scope but clears unverified 
   n.scopeProjects.checked = true; n.scopeProjects.emit('change'); n.loadProjects.emit('click'); await flush();
   assert.equal(n.scopeProjects.checked, true); assert.equal(n.projectsList.children.length, 0);
   assert.equal(n.consent.checked, false); assert.equal(n.shareSessions.checked, false); f.callbacks.get('pagehide')();
+});
+
+test('local reconnect is opt-in and credential modes revoke consent', async () => {
+  const f = fixture(); await flush(); const n = f.nodes;
+  assert.equal(n.autoReconnect.checked, false);
+  assert.equal(n.useLocal.disabled, true);
+  f.status.localCredentialSupported = true;
+  f.status.localConnection = { available: true, autoConnect: false };
+  n.refresh.emit('click'); await flush();
+  n.useLocal.checked = true; n.useLocal.emit('change');
+  assert.equal(n.connectorToken.required, false);
+  assert.equal(n.connectorToken.disabled, true);
+  assert.equal(n.vaultPassword.required, false);
+  n.autoReconnect.checked = true; n.autoReconnect.emit('change');
+  n.consent.checked = true; n.shareSessions.checked = true;
+  n.rememberConnection.checked = true; n.rememberConnection.emit('change');
+  assert.equal(n.useLocal.checked, false);
+  assert.equal(n.autoReconnect.checked, false);
+  assert.equal(n.consent.checked, false);
+  assert.equal(n.shareSessions.checked, false);
+  f.callbacks.get('pagehide')();
 });

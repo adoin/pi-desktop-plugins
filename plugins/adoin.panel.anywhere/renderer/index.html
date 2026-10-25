@@ -62,6 +62,8 @@
         <legend data-i18n="savedTitle">Saved connection</legend>
         <p data-i18n="savedHint">Address and ID are saved on Connect. Optionally encrypt the token with a password; the password is never saved. Upgrade in place; uninstall may remove plugin data.</p>
         <p id="savedState" role="status"></p>
+        <label class="consent"><input id="useLocal" type="checkbox" /><span data-i18n="useLocal">Use token encrypted for this Windows account (no password)</span></label>
+        <label class="consent"><input id="autoReconnect" type="checkbox" /><span data-i18n="autoReconnect">Encrypt locally and reconnect on startup, restoring only this approved sharing scope. Disconnect disables startup reconnect.</span></label>
         <label class="consent"><input id="useSaved" type="checkbox" /><span data-i18n="useSaved">Use the saved encrypted token</span></label>
         <label class="consent"><input id="rememberConnection" type="checkbox" /><span data-i18n="rememberConnection">Encrypt and remember the entered token</span></label>
         <label for="vaultPassword" data-i18n="vaultPassword">Encryption / unlock password (at least 12 characters)</label>
