@@ -8,12 +8,12 @@
     "en": {
       "name": "Agents Anywhere",
       "description": "Batch-share selected Pi projects and conversations with official or self-hosted Agents Anywhere. Discover, create, send, sync replies and interrupt tasks.",
-      "safetyNotes": "High risk: optional batch sharing exports selected projects' paths, session titles, user/assistant text, model IDs and status to your confirmed server, and allows remote prompts under each session's existing permissions. Project selections are saved per server/Connector; new projects are never selected automatically. Batch mode continues across active-workspace switches; removed or moved projects are refused. Changes apply on reconnect; disconnect to stop sharing immediately, without aborting accepted turns. Empty projects appear remotely only after a real session exists. net.anyHost grants arbitrary hosts at install; HTTP requests refuse redirects on PI-Desktop 0.18.0+. Credentials can be password-encrypted; passwords are not saved."
+      "safetyNotes": "High risk: optional batch sharing exports selected projects' paths, session titles, user/assistant text, model IDs and status to your confirmed server, and allows remote prompts under each session's existing permissions. Project selections are saved per server/Connector; new projects are never selected automatically. Batch mode continues across active-workspace switches; removed or moved projects are refused. Changes apply on reconnect; disconnect to stop sharing immediately, without aborting accepted turns. Empty projects appear remotely only after a real session exists. net.anyHost grants arbitrary hosts at install; HTTP requests refuse redirects on PI-Desktop 0.18.0+. Credentials can be password-encrypted; passwords are not saved. On Windows, explicit opt-in can instead use account-bound DPAPI encryption to reconnect and restore only the approved sharing scope when the plugin loads. Programs running as the same Windows user may decrypt it. Disconnect disables startup reconnect; Forget clears saved credentials."
     },
     "zh-CN": {
       "name": "Agents Anywhere 远程连接",
       "description": "批量共享选中的 Pi 项目及会话至官方或自部署 Agents Anywhere，支持发现、新建、发送、同步回复和中断任务。",
-      "safetyNotes": "高风险：可选批量共享会将选中项目的路径、会话标题、用户及助手文字、模型标识和状态发往您确认的服务器，并允许按会话现有权限远程发消息。项目选择按服务器及连接器保存，新项目不会自动勾选。批量模式不因切换当前工作区而停止，但拒绝已删除或移动的项目。修改选择在重连后生效；立即停止请断开，断开不终止已接收任务。空项目需产生真实会话后才会在远端出现。net.anyHost 为安装时任意主机授权；要求 PI-Desktop 0.18.0+，HTTP 请求拒绝重定向。可用密码加密保存令牌，密码不保存。"
+      "safetyNotes": "高风险：可选批量共享会将选中项目的路径、会话标题、用户及助手文字、模型标识和状态发往您确认的服务器，并允许按会话现有权限远程发消息。项目选择按服务器及连接器保存，新项目不会自动勾选。批量模式不因切换当前工作区而停止，但拒绝已删除或移动的项目。修改选择在重连后生效；立即停止请断开，断开不终止已接收任务。空项目需产生真实会话后才会在远端出现。net.anyHost 为安装时任意主机授权；要求 PI-Desktop 0.18.0+，HTTP 请求拒绝重定向。可用密码加密保存令牌，密码不保存。Windows 上可明确选择账户绑定的 DPAPI 加密，在插件加载时自动重连并仅恢复原先批准的共享范围。同一 Windows 账户下的程序也可能解密。断开会关闭启动重连；忘记会清除保存的凭据。"
     }
   },
   "author": "PI-Desktop Plugin Contributors",

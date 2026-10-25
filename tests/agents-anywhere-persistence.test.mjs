@@ -78,8 +78,9 @@ test('disconnect during persistence fences connection and concurrent mutations a
   while (!release) await flush();
   await assert.rejects(main.onPanelInvoke('anywhere.connect', f.config), { code: 'persistence_busy' });
   await assert.rejects(main.onPanelInvoke('anywhere.forget', { confirm: true }), { code: 'persistence_busy' });
-  await main.onPanelInvoke('anywhere.disconnect'); release();
-  await assert.rejects(pending, { code: 'UNAVAILABLE' }); assert.equal(f.state.requests.length, 0);
+  const rejected = assert.rejects(pending, { code: 'UNAVAILABLE' });
+  const stopping = main.onPanelInvoke('anywhere.disconnect'); release();
+  await rejected; await stopping; assert.equal(f.state.requests.length, 0);
 });
 
 test('unload drains a pending save so reload restores without a permanent busy error', async t => {

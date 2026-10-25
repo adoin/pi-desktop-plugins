@@ -147,8 +147,8 @@ ID and token. Pasted commands are parsed as data, never executed.
 Review the destination and check connection consent. Separately opt into sharing
 before connecting if remote chat is wanted. This uploads workspace paths, titles,
 user/assistant text, model identifiers and status, and allows remote prompts and
-interruption under the sessions' existing local tool permissions. No sharing
-consent is restored automatically after restart.
+interruption under the sessions' existing local tool permissions. Sharing consent
+is not restored unless Windows local encryption and startup reconnect were explicitly enabled.
 
 In Anywhere Web/desktop device settings, add **Pi Desktop** from Available to add,
 save its empty config and enable it. Discovery alone does not configure an Agent.
@@ -169,7 +169,7 @@ To retain the token too, select **Encrypt and remember the entered token** and s
 a strong unique password (12–1024 characters). After restart, the fields restore;
 select **Use saved encrypted token**, enter that password and confirm connection
 and sharing again. The plaintext token is not returned to the panel on unlock.
-There is no startup auto-connect or saved unlock password.
+This password-based option does not save the unlock password or auto-connect.
 
 Encryption uses asynchronous scrypt (N=32768, r=8, p=1) and AES-256-GCM with random
 salt/nonce. Authenticated metadata binds the ciphertext to origin/profile/ID.
@@ -179,6 +179,36 @@ the password cannot be reversed: explicitly Forget saved connection, then enter
 the original or newly issued token. Forget disconnects and clears connection
 settings only, not session mappings. A metadata-only save retains an encrypted
 token only for the same identity; changing identity discards the old envelope.
+
+### Windows-account encryption and startup reconnect
+
+In Connections, select **Encrypt locally and reconnect on startup** (本机加密保存，启动时自动重连),
+review the server and sharing scope, explicitly confirm connection/sharing, then Connect.
+The first setup requires entering the original token once. Future launches use Windows
+DPAPI CurrentUser to decrypt locally and restore that connection and approved scope.
+The token and scope are encrypted together in plugin-private `anywhereLocalConnectionV1`;
+origin/profile/Connector ID must still match public metadata before credentials are used.
+No plaintext token or unlock password is written. A fixed PowerShell command uses anonymous
+pipes (Base64 bytes for locale-independent transport), not secret command-line arguments.
+It creates no plaintext temporary file and does not call a network service for encryption.
+
+Current-workspace sharing restores only when the active path still matches the approved
+path. Selected-project sharing pins each original project ID/path; added projects are
+never included, and moved/deleted approved projects stop restoration. Connection-only
+mode stays connection-only. Original session permissions and host confirmations remain.
+
+**Disconnect** stops remote access and disables startup reconnect but retains the encrypted
+token for manual use via **Use token encrypted for this Windows account**. **Forget** removes
+both local and password-encrypted connection credentials, not session mappings. Ordinary
+application shutdown preserves startup reconnect. Unchecking startup reconnect takes
+effect on Connect/apply; use Disconnect to revoke immediately.
+
+This option is Windows-only. DPAPI protects data at rest from other accounts, not programs
+already running as your Windows account. Moving the settings to another machine/account
+may require entering the token again. There is no plaintext fallback. Existing password
+encryption remains available on all supported platforms; choose one storage mode.
+No operating-system startup task or service is installed; restoration runs only when
+the plugin loads in PI-Desktop.
 
 ## Scope and limits
 
